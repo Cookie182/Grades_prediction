@@ -67,7 +67,7 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y['Pass/Fail'])
 
     # passing probability predictor
-    passfail = make_pipeline(StandardScaler(), LogisticRegressionCV(Cs=np.arange(0.1, 0.6, 0.1),
+    passfail = make_pipeline(StandardScaler(), LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
                                                                     cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
                                                                     max_iter=1000, n_jobs=-1, refit=True,
                                                                     random_state=7,
