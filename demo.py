@@ -5,6 +5,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import pickle
+from datetime import datetime
 from scipy import stats as ss
 from mysql import connector as mysql
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -20,6 +21,7 @@ warnings.filterwarnings('ignore')
 
 
 """ MAKE SURE THE DATABASE DETAILS ARE CORRECT FOR YOU """
+course_len = 4  # how many years is the course
 path = "C:/ProgramData/MySQL/MySQL Server 8.0/Data/btechcse"  # path to database and to store prediction models
 db = mysql.connect(host='localhost', user='Ashwin', password='3431', database="btechcse")  # initializing connection to database
 cursor = db.cursor(buffered=True)  # cursor
@@ -65,12 +67,12 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y['Pass/Fail'])
 
     # passing probability predictor
-    passfail = make_pipeline(StandardScaler(), LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
-                                                                    cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
-                                                                    max_iter=1000, n_jobs=-1, refit=True,
-                                                                    random_state=7,
-                                                                    class_weight='balanced')).fit(X_test,
-                                                                                                  y_test['Pass/Fail'])
+    passfail = make_pipeline(StandardScaler(),
+                             LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
+                                                  cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
+                                                  max_iter=1000, n_jobs=-1, refit=True,
+                                                  random_state=7,
+                                                  class_weight='balanced')).fit(X_test, y_test['Pass/Fail'])
 
     if graphs == True:
         for x in range(len(test_type)):
@@ -545,7 +547,8 @@ def teacher_session(teacher_id):
 
 
 def teacher_auth():
-    user = input("\nEnter username : ")
+    print("\nTeacher Login\n")
+    user = input("Enter username : ")
     passw = input("Enter password : ")
     cursor.execute("SELECT username FROM teachers")
     if user in [x[0] for x in cursor.fetchall()]:
@@ -573,16 +576,14 @@ def admin_session():
         if choice == '1':  # automatically setting up the main 3 prerequisite tables required for further operations in course
             cursor.execute("SHOW TABLES LIKE 'subjects'")
             if len(cursor.fetchall()) < 1:
-                year = input("Enter what year to make a students table for : ")
-
                 print("\nCreating teacher table")
                 cursor.execute(
-                    f"CREATE TABLE {database}.teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT , first_name VARCHAR(30) NOT NULL , last_name VARCHAR(30) NOT NULL , username VARCHAR(20) NOT NULL , password VARCHAR(20) NOT NULL , PRIMARY KEY (teacher_id), UNIQUE (username))")
+                    "CREATE TABLE IF NOT EXISTS teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT, first_name VARCHAR(30) NOT NULL, last_name VARCHAR(30) NOT NULL, username VARCHAR(20) NOT NULL,email TEXT(50) NULL, password VARCHAR(20) NOT NULL,  PRIMARY KEY (teacher_id), UNIQUE (username))")
                 db.commit()
 
                 print("\nCreating subjects table")
                 cursor.execute(
-                    f"CREATE TABLE {database}.subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (`id`), INDEX (`teacher_id`)) ENGINE = InnoDB")
+                    "CREATE TABLE subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (id))")
                 db.commit()
 
                 # creating foreign key for subjects and teachers for teacher_id
@@ -590,11 +591,11 @@ def admin_session():
                     "ALTER TABLE subjects ADD FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL ON UPDATE CASCADE")
                 db.commit()
 
+                # creating table to store students semester count, year start and expected year of graduation
                 print("\nCreating students table")
-                cursor.execute(
-                    f"CREATE TABLE {database}.students_{year}(id INT(5) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, PRIMARY KEY(id), UNIQUE (username))")
+                cursor.execute("CREATE TABLE students_batch (start_year INT NOT NULL AUTO_INCREMENT, grad_year INT, students INT NOT NULL DEFAULT 0, lat_students INT DEFAULT 0, tot_students INT DEFAULT 0, cur_semester INT DEFAULT 1, PRIMARY KEY (start_year))")
                 db.commit()
-                print(f"\nstudents_{year}, teachers and subjects table successfully created\n")
+                print("\nstudents_batch, teachers and subjects table successfully created\n")
 
             else:
                 print("Main tables seem to already have been created\n")
@@ -628,6 +629,7 @@ def admin_session():
 
         elif choice == '3':  # adding or deleting a subject
             while True:
+                print("Managing subjects")
                 print("\n1. Add a subject")
                 print("2. Delete a subject")
                 print("3. Go back")
@@ -679,7 +681,7 @@ def admin_session():
 
                                 final_test_name = test_type[-1]
                                 cursor.execute(
-                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
+                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3), PRIMARY KEY (Type))")
                                 db.commit()
 
                                 passfail, overallgrade = grades(test_type, test_amount, max_mark,
@@ -699,8 +701,8 @@ def admin_session():
                                 print(f"Details for {full_name} added\n")
 
                                 # getting all student record tables for all years
-                                cursor.execute("SHOW TABLES LIKE 'students_%'")
-                                tables = [x[0] for x in cursor.fetchall() if len(x[0]) < 15]
+                                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
+                                tables = [x[0] for x in cursor.fetchall()]
                                 if len(tables) > 0:
                                     # making marking sheets for subjects for all students who have a student record
                                     for table in tables:
@@ -809,6 +811,7 @@ def admin_session():
 
         elif choice == '4':  # managing teacher accounts
             while True:
+                print("Managing teacher accounts")
                 print("\n1. Add a teacher account")
                 print("2. Delete a teacher account")
                 print("3. Go back")
@@ -849,8 +852,9 @@ def admin_session():
                 else:
                     print("NO valid option entered\n")
 
-        elif choice == '5':
+        elif choice == '5':  # managing student account/records
             while True:
+                print("Managing student accounts/records")
                 print("\n1. Create new student records for new batch")
                 print("2. Add a student account")
                 print("3. Delete a student account")
@@ -859,13 +863,42 @@ def admin_session():
                 if choice == '1':  # creating a new student records table for new batch and grade sheets
                     print("\nCreating new student record\n")
                     year = input("Enter year to create student record for : ")
-                    cursor.execute(f"SHOW TABLES LIKE 'students_{year}'")
-                    if len([x[0] for x in cursor.fetchall()]) < 1:
-                        cursor.execute(
-                            f"CREATE TABLE btechcse.students_{year}(id INT(5) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, PRIMARY KEY(id), UNIQUE(username))")
+                    cursor.execute("SELECT start_year FROM students_batch")
+
+                    # checking if batch year already exists
+                    if int(year) not in [x[0] for x in cursor.fetchall()]:
+                        # creating entry for students batch table
+                        cursor.execute(f"INSERT INTO students_batch (start_year, grad_year) VALUES ({int(year)}, {int(year) + {course_len}})")
                         db.commit()
 
                         table = f"students_{year}"  # name of new student records
+                        # creating student record for that batch
+                        cursor.execute(
+                            f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, start_year INT DEFAULT {int(year)},start_sem INT DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
+                        db.commit()
+
+                        # foreign key referencing students_batch table to student record
+                        cursor.execute(f"ALTER TABLE {table} ADD FOREIGN KEY (start_year) REFERENCES students_batch(start_year)")
+                        db.commit()
+
+                        # triggers for counting normal entry students after either deleting/updating/inserting new data for each record
+                        cursor.execute(
+                            f"CREATE TRIGGER normal_student_count_{year}_insert AFTER INSERT ON {table} FOR EACH ROW UPDATE students_batch SET students = (SELECT COUNT(*) FROM {table} WHERE entry = 'Normal') WHERE start_year={int(year)}")
+                        db.commit()
+
+                        cursor.execute(
+                            f"CREATE TRIGGER normal_student_count_{year}_delete AFTER DELETE ON {table} FOR EACH ROW UPDATE students_batch SET students = (SELECT COUNT(*) FROM {table} WHERE entry = 'Normal') WHERE start_year={int(year)}")
+                        db.commit()
+
+                        # triggers for counting lateral entry students after either deleting/updating/inserting new data for each record
+                        cursor.execute(
+                            f"CREATE TRIGGER lateral_student_count_{year}_insert AFTER INSERT ON {table} FOR EACH ROW UPDATE students_batch SET lat_students = (SELECT COUNT(*) FROM {table} WHERE entry = 'Lateral') WHERE start_year={int(year)}")
+                        db.commit()
+
+                        cursor.execute(
+                            f"CREATE TRIGGER lateral_student_count_{year}_delete AFTER DELETE ON {table} FOR EACH ROW UPDATE students_batch SET lat_students = (SELECT COUNT(*) FROM {table} WHERE entry = 'Lateral') WHERE start_year={int(year)}")
+                        db.commit()
+
                         cursor.execute("SELECT id FROM subjects")
                         subjects = [x[0] for x in cursor.fetchall()]
                         for subject in subjects:
@@ -912,16 +945,18 @@ def admin_session():
                                 f"CREATE TRIGGER {new_table} AFTER INSERT ON {table} FOR EACH ROW INSERT INTO {new_table} (student_id) values (new.id)")
                             db.commit()
                         print(f"{table} records created\n")
+                    else:
+                        print(f"Student record for {year} already exists\n")
 
-                elif choice == '2':
+                elif choice == '2':  # adding students to a record
                     print("\nAdding a student to a record\n")
-                    cursor.execute("SHOW TABLES LIKE 'students%'")
-                    student_records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 14], start=1))
+                    cursor.execute("SELECT start_year FROM students_batch")
+                    student_records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
                     [print(f"{x[0]}. {x[1]}") for x in student_records]
                     print(f"{len(student_records)+1}. Go back")
-                    choice = input("Choice : ")
+                    choice = input("Year : ")
                     if int(choice) in range(1, len(student_records)+1):
-                        student_record = student_records[int(choice)-1][1]
+                        student_record = f"students_{student_records[int(choice)-1][1]}"
                         cursor.execute(f"SELECT username FROM {student_record}")
                         existing_users = [x[0] for x in cursor.fetchall()]
                         year = student_record[len(student_record)-4:]
@@ -929,8 +964,26 @@ def admin_session():
                             user = input("\nEnter username for new student : ")
                             if user not in existing_users:
                                 email = f"{user}_{year}@dypiu.ac.in"
+                                while True:
+                                    try:
+                                        sem = int(input("Which semester did the student join from? : "))
+                                        if sem == 1:
+                                            cursor.execute(
+                                                f"INSERT INTO {student_record} (first_name, last_name, email, username, password) VALUES ('{input('Enter first name: ')}', '{input('Enter last name: ')}', '{email}', '{user}', '{input('Enter password: ')}')")
+                                            db.commit()
+                                            break
+                                        else:
+                                            cursor.execute(
+                                                f"INSERT INTO {student_record} (first_name, last_name, email, username, password, start_sem, entry) VALUES ('{input('Enter first name: ')}', '{input('Enter last name: ')}', '{email}', '{user}', '{input('Enter password: ')}', {sem}, 'Lateral')")
+                                            db.commit()
+                                            break
+                                    except:
+                                        print("Enter valid value for semester\n")
+
+                                cursor.execute(f"SELECT students + lat_students FROM students_batch WHERE start_year = {int(year)}")
+                                tot_students = cursor.fetchall()[0][0]
                                 cursor.execute(
-                                    f"INSERT INTO {student_record} (first_name, last_name, email, username, password) VALUES ('{input('Enter first name: ')}', '{input('Enter last name: ')}', '{email}', '{user}', '{input('Enter password: ')}')")
+                                    f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(year)}")
                                 db.commit()
                                 print(f"\n{user} has been added as a student\n")
                                 break
@@ -940,15 +993,15 @@ def admin_session():
                         print('\nGoing back\n')
                         continue
 
-                elif choice == '3':
+                elif choice == '3':  # deleting a student from a record
                     print("\nDeleting a student from a record\n")
-                    cursor.execute("SHOW TABLES LIKE 'students%'")
-                    student_records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 14], start=1))
+                    cursor.execute("SELECT start_year FROM students_batch")
+                    student_records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
                     [print(f"{x[0]}. {x[1]}") for x in student_records]
                     print(f"{len(student_records)+1}. Go back")
-                    choice = input("Choice : ")
+                    choice = input("Which batch? : ")
                     if int(choice) in range(1, len(student_records)+1):
-                        student_record = student_records[int(choice)-1][1]
+                        student_record = f"students_{student_records[int(choice)-1][1]}"
                         user = input("Input username of student to delete : ")
                         print(f"\nAre you sure to delete {user}?")
                         print("1. YES")
@@ -958,6 +1011,12 @@ def admin_session():
                             cursor.execute(f"DELETE FROM {student_record} WHERE username = '{user}'")
                             db.commit()
                             print(f"\n{user} has been removed from {student_record}\n")
+
+                            cursor.execute(f"SELECT students + lat_students FROM students_batch WHERE start_year = {int(student_records[int(choice)-1][1])}")
+                            tot_students = cursor.fetchall()[0][0]
+                            cursor.execute(
+                                f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(student_records[int(choice)-1][1])}")
+                            db.commit()
 
                         else:
                             print("\nGoing back\n")
@@ -976,6 +1035,7 @@ def admin_session():
 
 
 def admin_auth():
+    print("\nAdmin Login\n")
     if input("\nEnter username : ") == 'admin' and input("Enter password : ") == '1234':
         admin_session()
     else:
