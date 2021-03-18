@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import pickle
-from datetime import datetime
+import stdiomask
 from scipy import stats as ss
 from mysql import connector as mysql
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -15,9 +15,9 @@ from sklearn.linear_model import LinearRegression, LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec as gs
-plt.style.use('bmh')
-sns.set_style('dark')
-warnings.filterwarnings('ignore')
+plt.style.use('bmh')  # matplotlib graph style
+sns.set_style('dark')  # seaborn graph style
+warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
 
 
 """ MAKE SURE THE DATABASE DETAILS ARE CORRECT FOR YOU """
@@ -179,7 +179,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
 
     # getting the name of tests used for predictions
     cursor.execute(f"DESCRIBE {record}_{subject}")
-    tests = [x[0] for x in cursor.fetchall()][1:-3]
+    tests = [x[0] for x in cursor.fetchall()][1:-4]
 
     fig = plt.figure(figsize=(14, 7))
     grid = gs(nrows=1, ncols=2, figure=fig)
@@ -215,6 +215,8 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
 
     print("\nDetailed predictions for marks shown\n")
 
+# milou
+
 
 def student_session(record, user):
     while True:
@@ -248,7 +250,7 @@ def student_session(record, user):
                 choice = input("Choice : ")
                 if choice == '1':
                     cursor.execute(f"DESCRIBE {record}_{subject}")
-                    tests = [x[0] for x in cursor.fetchall()][1:-3]
+                    tests = [x[0] for x in cursor.fetchall()][1:-4]
                     for test in tests:  # iterating and getting marks for tests except for the final test
                         cursor.execute(f"SELECT {test} FROM {record}_{subject} WHERE student_id = {id}")
                         marks.append(cursor.fetchall()[0][0])
@@ -298,27 +300,27 @@ def student_session(record, user):
 
 
 def student_auth():
-    cursor.execute("SHOW TABLES LIKE 'students%'")
-    records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
+    cursor.execute("SELECT start_year FROM students_batch")
+    records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
     print("\nWhich record do you belong to?")
     [print(f"{x[0]}. {x[1]}") for x in records]  # choosing which student record they belong to
     choice = input("Choice : ")
     if int(choice) in [x[0] for x in records]:
-        record = records[int(choice)-1][1]
+        record = f"students_{records[int(choice)-1][1]}"
         print("\nStudent Login\n")
-        user = input("Enter username : ")  # checking login details
-        passw = input("Enter password : ")
+        user = input("Username : ")  # checking login details
+        passw = stdiomask.getpass(prompt='Password : ')
         cursor.execute(f"SELECT username FROM {record}")
         if user in [x[0] for x in cursor.fetchall()]:
             cursor.execute(f"SELECT password FROM {record} WHERE username = '{user}'")
             if passw == cursor.fetchall()[0][0]:
                 student_session(record, user)
             else:
-                print("\nIncorrect details, going back\n")
+                print("\nIncorrect details, going back...\n")
         else:
-            print("\nIncorrect details, going back\n")
+            print("\nIncorrect details, going back...\n")
     else:
-        print("Going back\n")
+        print("Incorrect choice, going back...\n")
 
 
 def teacher_session(teacher_id):
@@ -342,7 +344,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES LIKE 'students%'")
+                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -356,11 +358,11 @@ def teacher_session(teacher_id):
                     print(pd.read_sql(f"SELECT * FROM {table}", db, index_col='student_id'), '\n')
                     print(f"\n{record}_{subject} values shown\n")
                 else:
-                    print("Going back\n")
+                    print("Incorrect choice, going back...\n")
                     continue
 
             else:
-                print("Going back\n")
+                print("Incorrect choice, going back...\n")
                 continue
 
         elif choice == '2':  # updating scores of students for a test
@@ -372,7 +374,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES LIKE 'students%'")
+                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -411,7 +413,7 @@ def teacher_session(teacher_id):
                         for id in ids:
                             cursor.execute(f"DESCRIBE {record}_{subject}")
                             # get the name of tests for prediction
-                            tests = [x[0] for x in cursor.fetchall()][1:-3]
+                            tests = [x[0] for x in cursor.fetchall()][1:-4]
                             mark = []
                             for test in tests:
                                 cursor.execute(f"SELECT {test} FROM {record}_{subject} WHERE student_id = {id}")
@@ -443,21 +445,62 @@ def teacher_session(teacher_id):
 
                             cursor.execute(f"UPDATE {record}_{subject} SET PREDICTED_GRADE = '{predict_grade}' WHERE student_id = {id}")
                             db.commit()
+
+                            # gathering tests to calculate actual grade using subject details and actual current marks
+                            cursor.execute(f"SELECT * FROM {record}_{subject} WHERE student_id = {id}")
+                            marks = [int(x) for x in [x for x in cursor.fetchall()[0]][1:-3]]
+
+                            cursor.execute(f"SELECT Amount FROM {subject}_details")
+                            amounts = [int(x[0]) for x in cursor.fetchall()]
+
+                            cursor.execute(f"SELECT Weightage FROM {subject}_details")
+                            weightages = [float(x[0]) for x in cursor.fetchall()]
+
+                            cursor.execute(f"SELECT Max_mark FROM {subject}_details")
+                            max_marks = [int(x[0]) for x in cursor.fetchall()]
+
+                            # calculating rolling actual grade of student
+                            mults = []
+                            c = 0
+                            for x in range(len(amounts)):
+                                for y in range(amounts[x]):
+                                    mults.append((marks[c] / max_marks[x]) * (weightages[x] / amounts[x]))
+                                    c += 1
+                            mults = [np.round(x*100, 2) for x in mults]
+                            p_grade = np.sum(mults)
+                            l_grade = None
+                            if p_grade >= 90:
+                                l_grade = 'A+'
+                            elif p_grade >= 80:
+                                l_grade = 'A'
+                            elif p_grade >= 70:
+                                l_grade = 'B'
+                            elif p_grade >= 60:
+                                p_grade = 'C'
+                            elif p_grade >= 50:
+                                l_grade = 'D'
+                            else:
+                                l_grade = 'F'
+
+                            grade = f"{p_grade} ({l_grade})"
+                            cursor.execute(f"UPDATE {record}_{subject} SET GRADE = '{grade}' WHERE student_id = {id}")
+                            db.commit()
+
                         print("Marks updated\n")
 
                     else:
-                        print("Going back\n")
+                        print("Incorreect choice, going back...\n")
                         continue
 
                 else:
-                    print("Going back\n")
+                    print("Incorrect choice, going back...\n")
                     continue
 
             elif int(choice) == len(subjects)+1:
-                print("Going back\n")
+                print("Incorrect choice, going back...\n")
                 continue
 
-        elif choice == '3':  # updating grade of one studnet in a particular subject
+        elif choice == '3':  # updating grade of one student in a particular subject
             print("For which subject?\n")
             [print(f"{x[0]}. {x[1]}") for x in subjects]
             print(f"{len(subjects)+1}. Go back")
@@ -466,7 +509,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES LIKE 'students%'")
+                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -479,7 +522,7 @@ def teacher_session(teacher_id):
                     cursor.execute(f"SELECT student_id FROM {record}_{subject}")
                     ids = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
                     [print(f"{x[0]}. {x[1]}") for x in ids]
-                    print(f"{len(ids)}. Go back")
+                    print(f"{len(ids)+1}. Go back")
                     choice = input("Choice : ")
                     if int(choice) in [x[0] for x in ids]:
                         student_id = ids[int(choice)-1][1]
@@ -487,20 +530,100 @@ def teacher_session(teacher_id):
                         tests = list(enumerate([x[0] for x in cursor.fetchall() if x[0] not in ["student_id", "PASS_CHANCE", "PREDICTED_GRADE"]], start=1))
                         print("\nWhich test?\n")
                         [print(f"{x[0]}. {x[1]}") for x in tests]
-                        print(f"{len(tests)}. Go back")
                         choice = input("Choice : ")
                         if int(choice) in [x[0] for x in tests]:
                             test = tests[int(choice)-1][1]
                             mark = input(f"\nEnter new mark for student_id {student_id} in {test} for {subject}\n")
                             cursor.execute(f"UPDATE {record}_{subject} SET {test} = {int(mark)} WHERE student_id = {student_id}")
                             db.commit()
-                            print(f"Mark updated for student_id {student_id} in {test} for {subject}\n")
+
+                            # loading subject prediction models
+                            passfail = pickle.load(open(f"{path}/{subject}_passfail", 'rb'))
+                            overallgrade = pickle.load(open(f"{path}/{subject}_overallgrade", 'rb'))
+
+                            cursor.execute(f"DESCRIBE {record}_{subject}")
+                            # get the name of tests for prediction
+                            exams = [x[0] for x in cursor.fetchall()][1: -4]
+                            mark = []
+                            for exam in exams:
+                                cursor.execute(f"SELECT {exam} FROM {record}_{subject} WHERE student_id = {student_id}")
+                                mark.append(cursor.fetchall()[0][0])
+
+                            # converting to a 2d array so scikit-learn models can use them for predictions
+                            mark = np.array(mark).reshape(1, -1)
+                            predict_passing = round(passfail.predict_proba(mark)[0][1]*100, 2)  # proabability of passing the subject
+                            predict_grade = round(overallgrade.predict(mark)[0]*100, 2)  # predicted grade of overall subject after finals
+                            predict_lettergrade = None  # giving letter based grade based on predicted overall percentage after finals
+                            if predict_grade >= 90:
+                                predict_lettergrade = 'A+'
+                            elif predict_grade >= 80:
+                                predict_lettergrade = 'A'
+                            elif predict_grade >= 70:
+                                predict_lettergrade = 'B'
+                            elif predict_grade >= 60:
+                                predict_lettergrade = 'C'
+                            elif predict_grade >= 50:
+                                predict_lettergrade = 'D'
+                            else:
+                                predict_lettergrade = 'F'
+
+                            # new predict grade with mark and letter grade
+                            predict_grade = f"{predict_grade} ({predict_lettergrade})"
+
+                            cursor.execute(f"UPDATE {record}_{subject} SET PASS_CHANCE = {predict_passing} WHERE student_id = {student_id}")
+                            db.commit()
+
+                            cursor.execute(f"UPDATE {record}_{subject} SET PREDICTED_GRADE = '{predict_grade}' WHERE student_id = {student_id}")
+                            db.commit()
+                            # gathering tests to calculate actual grade using subject details and actual current marks
+                            cursor.execute(f"SELECT * FROM {record}_{subject} WHERE student_id = {student_id}")
+                            marks = [int(x) for x in [x for x in cursor.fetchall()[0]][1:-3]]
+
+                            cursor.execute(f"SELECT Amount FROM {subject}_details")
+                            amounts = [int(x[0]) for x in cursor.fetchall()]
+
+                            cursor.execute(f"SELECT Weightage FROM {subject}_details")
+                            weightages = [float(x[0]) for x in cursor.fetchall()]
+
+                            cursor.execute(f"SELECT Max_mark FROM {subject}_details")
+                            max_marks = [int(x[0]) for x in cursor.fetchall()]
+
+                            # calculating rolling actual grade ef student
+                            mults = []
+                            c = 0
+                            for x in range(len(amounts)):
+                                for y in range(amounts[x]):
+                                    mults.append((marks[c] / max_marks[x]) * (weightages[x] / amounts[x]))
+                                    c += 1
+                            mults = [np.round(x*100, 2) for x in mults]
+                            p_grade = np.sum(mults)
+                            l_grade = None
+                            if p_grade >= 90:
+                                l_grade = 'A+'
+                            elif p_grade >= 80:
+                                l_grade = 'A'
+                            elif p_grade >= 70:
+                                l_grade = 'B'
+                            elif p_grade >= 60:
+                                p_grade = 'C'
+                            elif p_grade >= 50:
+                                l_grade = 'D'
+                            else:
+                                l_grade = 'F'
+
+                            grade = f"{p_grade} ({l_grade})"
+                            cursor.execute(f"UPDATE {record}_{subject} SET GRADE = '{grade}' WHERE student_id = {student_id}")
+                            db.commit()
+
+                            print(f"\nMark updated for student_id {student_id} in {test} for {subject}\n")
+                        else:
+                            print("Incorrect choice, going back...\n")
                     else:
-                        print("Going back\n")
+                        print("Incorrect choice, going back...\n")
                 else:
-                    print("Going back\n")
+                    print("Incorrect choice, going back...\n")
             else:
-                print("Going back\n")
+                print("Incorrect choice, going back...\n")
 
         elif choice == '4':  # changing first_name, last_name or password of teacher account
             print("\nChanging account detail\n")
@@ -518,7 +641,7 @@ def teacher_session(teacher_id):
                 print(f"{detail} updated\n")
 
             else:
-                print("Going back\n")
+                print("Incorrect choice, going back...\n")
                 continue
 
         elif choice == '5':
@@ -539,17 +662,17 @@ def teacher_session(teacher_id):
                     print("Invalid option, going back\n")
 
         elif choice == '6':
-            print("Logging out\n")
+            print("Logging out...\n")
             break
 
         else:
-            print("No valid option entered\n")
+            print("No valid option entered...\n")
 
 
 def teacher_auth():
     print("\nTeacher Login\n")
-    user = input("Enter username : ")
-    passw = input("Enter password : ")
+    user = input("Username : ")
+    passw = stdiomask.getpass(prompt='Password : ')
     cursor.execute("SELECT username FROM teachers")
     if user in [x[0] for x in cursor.fetchall()]:
         cursor.execute(f"SELECT password FROM teachers WHERE username = '{user}'")
@@ -557,9 +680,9 @@ def teacher_auth():
             cursor.execute(f"SELECT teacher_id FROM teachers WHERE username = '{user}'")
             teacher_session(cursor.fetchall()[0][0])
         else:
-            print("\nWrong password\n")
+            print("\nWrong password...\n")
     else:
-        print("\nWrong username\n")
+        print("\nWrong username...\n")
 
 
 def admin_session():
@@ -621,11 +744,11 @@ def admin_session():
                     print(f"\n{table} details shown\n")
 
                 elif int(choice) == len(tables)+1:
-                    print("\nGoing back\n")
+                    print("\nGoing back...\n")
                     break
 
                 else:
-                    print("Enter valid choice\n")
+                    print("Enter valid choice...\n")
 
         elif choice == '3':  # adding or deleting a subject
             while True:
@@ -681,7 +804,7 @@ def admin_session():
 
                                 final_test_name = test_type[-1]
                                 cursor.execute(
-                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3), PRIMARY KEY (Type))")
+                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
                                 db.commit()
 
                                 passfail, overallgrade = grades(test_type, test_amount, max_mark,
@@ -736,6 +859,8 @@ def admin_session():
                                         db.commit()
                                         cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
                                         db.commit()
+                                        cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                                        db.commit()
 
                                         # adding each student id for each student record table and this subject
                                         cursor.execute(f"SELECT id FROM {table}")
@@ -749,15 +874,15 @@ def admin_session():
 
                                     print(f"Grades sheets for {subj_name} created\n")
                                 else:
-                                    print("No student record tables found\n")
+                                    print("No student record tables found...\n")
                             except:
                                 cursor.execute("DELETE FROM subjects WHERE id = %s", (subj_name,))
                                 db.commit()
-                                print("Enter valid subject details\n")
+                                print("Enter valid subject details...\n")
                         else:
-                            print(f"{subj_name} already exists in the subjects table\n")
+                            print(f"{subj_name} already exists in the subjects table...\n")
                     else:
-                        print("Make sure to enter the teacher details in the teacher table first\n")
+                        print("Make sure to enter the teacher details in the teacher table first...\n")
 
                 elif choice == '2':  # deleting a subject
                     print("\nDeleting a subject\n")
@@ -784,7 +909,7 @@ def admin_session():
                                     cursor.execute(f"DROP TABLE {table}")
                                     db.commit()
 
-                            cursor.execute(f"SHOW TABLES LIKE 'students%'")
+                            cursor.execute(f"SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch''")
                             records = [x[0] for x in cursor.fetchall() if len(x[0]) < 15]
                             for record in records:
                                 cursor.execute(f"DROP TRIGGER IF EXISTS {record}_{subject}")
@@ -799,15 +924,15 @@ def admin_session():
                             print(f"{subject} has been deleted\n")
 
                         else:
-                            print("Going back\n")
+                            print("Going back...\n")
                             break
 
                 elif choice == '3':
-                    print("Going back\n")
+                    print("Going back...\n")
                     break
 
                 else:
-                    print("No valid choice entered\n")
+                    print("Invalid choice, going back...\n")
 
         elif choice == '4':  # managing teacher accounts
             while True:
@@ -825,7 +950,7 @@ def admin_session():
                     cursor.execute("INSERT INTO teachers (first_name, last_name, username, password) VALUES (%s, %s, %s, %s)",
                                    (first, last, user, passw))
                     db.commit()
-                    print(f"{first} has been added as a teacher\n")
+                    print(f"{user} has been added as a teacher\n")
 
                 elif choice == '2':
                     print("Deleting a teacher\n")
@@ -839,18 +964,20 @@ def admin_session():
                         print("2. No")
                         choice = input("Choice : ")
                         if choice == '1':
+                            cursor.execute(f"SELECT username FROM teachers WHERE teacher_id = {choice}")
+                            user = cursor.fetchall()[0][0]
                             cursor.execute(f"DELETE FROM teachers WHERE teacher_id = {choice}")
                             db.commit()
-                            print("Teacher has been deleted\n")
+                            print(f"{user} has been deleted from teacher records\n")
                     else:
-                        print("Invalid option entered\n")
+                        print("Invalid choice, going back...\n")
 
                 elif choice == '3':
-                    print("Going back\n")
+                    print("Going back...\n")
                     break
 
                 else:
-                    print("NO valid option entered\n")
+                    print("Incorrect choice, enter a valid choice...\n")
 
         elif choice == '5':  # managing student account/records
             while True:
@@ -868,13 +995,13 @@ def admin_session():
                     # checking if batch year already exists
                     if int(year) not in [x[0] for x in cursor.fetchall()]:
                         # creating entry for students batch table
-                        cursor.execute(f"INSERT INTO students_batch (start_year, grad_year) VALUES ({int(year)}, {int(year) + {course_len}})")
+                        cursor.execute(f"INSERT INTO students_batch (start_year, grad_year) VALUES ({int(year)}, {int(year) + course_len})")
                         db.commit()
 
                         table = f"students_{year}"  # name of new student records
                         # creating student record for that batch
                         cursor.execute(
-                            f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, start_year INT DEFAULT {int(year)},start_sem INT DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
+                            f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, start_year INT NOT NULL DEFAULT {int(year)},start_sem INT NOT NULL DEFAULT 1, cur_semester INT NOT NULL DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
                         db.commit()
 
                         # foreign key referencing students_batch table to student record
@@ -898,6 +1025,17 @@ def admin_session():
                         cursor.execute(
                             f"CREATE TRIGGER lateral_student_count_{year}_delete AFTER DELETE ON {table} FOR EACH ROW UPDATE students_batch SET lat_students = (SELECT COUNT(*) FROM {table} WHERE entry = 'Lateral') WHERE start_year={int(year)}")
                         db.commit()
+
+                        # trigger to update semester count between student records table and students_batch table
+                        cursor.execute(
+                            f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {int(year)})")
+
+                        # create 2 events to auto increment the semester count for each student batch
+                        cursor.execute(
+                            f"CREATE EVENT IF NOT EXISTS sem_count_{year}_jan ON SCHEDULE EVERY 1 YEAR STARTS '{int(year)+1}-01-01' ENDS '{int(year)+course_len}-01-01' DO UPDATE students_batch SET cur_semester = cur_semester + 1 WHERE start_year = {year}")
+
+                        cursor.execute(
+                            f"CREATE EVENT IF NOT EXISTS sem_count_{year}_aug ON SCHEDULE EVERY 1 YEAR STARTS '{int(year)+1}-08-01' ENDS '{int(year)+(course_len-1)}-08=01' DO UPDATE students_batch SET cur_semester = cur_semester + 1 WHERE start_year = {year}")
 
                         cursor.execute("SELECT id FROM subjects")
                         subjects = [x[0] for x in cursor.fetchall()]
@@ -934,6 +1072,8 @@ def admin_session():
                             db.commit()
                             cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
                             db.commit()
+                            cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                            db.commit()
 
                             # adding each student id for each student record table and this subject
                             cursor.execute(f"SELECT id FROM {table}")
@@ -968,14 +1108,25 @@ def admin_session():
                                     try:
                                         sem = int(input("Which semester did the student join from? : "))
                                         if sem == 1:
+                                            cursor.execute(f"DROP TRIGGER IF EXISTS semester_count_{year}")
+
                                             cursor.execute(
                                                 f"INSERT INTO {student_record} (first_name, last_name, email, username, password) VALUES ('{input('Enter first name: ')}', '{input('Enter last name: ')}', '{email}', '{user}', '{input('Enter password: ')}')")
                                             db.commit()
+
+                                            # trigger to update semester count between student records table and students_batch table
+                                            cursor.execute(
+                                                f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {int(year)})")
                                             break
                                         else:
+                                            cursor.execute(f"DROP TRIGGER IF EXISTS semester_count_{year}")
+
                                             cursor.execute(
                                                 f"INSERT INTO {student_record} (first_name, last_name, email, username, password, start_sem, entry) VALUES ('{input('Enter first name: ')}', '{input('Enter last name: ')}', '{email}', '{user}', '{input('Enter password: ')}', {sem}, 'Lateral')")
                                             db.commit()
+
+                                            cursor.execute(
+                                                f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {year})")
                                             break
                                     except:
                                         print("Enter valid value for semester\n")
@@ -990,7 +1141,7 @@ def admin_session():
                             else:
                                 print(f"\n{username} already exists, try again\n")
                     else:
-                        print('\nGoing back\n')
+                        print('\nInvalid choice, going back...\n')
                         continue
 
                 elif choice == '3':  # deleting a student from a record
@@ -1001,15 +1152,29 @@ def admin_session():
                     print(f"{len(student_records)+1}. Go back")
                     choice = input("Which batch? : ")
                     if int(choice) in range(1, len(student_records)+1):
-                        student_record = f"students_{student_records[int(choice)-1][1]}"
+                        year = student_records[int(choice)-1][1]
+                        student_record = f"students_{year}"
                         user = input("Input username of student to delete : ")
+
+                        cursor.execute(f"SELECT username FROM {student_record}")
+                        users = [x[0] for x in cursor.fetchall()]
+                        if user not in users:
+                            print(f"Invalid user: {user}, going back...\n")
+                            continue
+
                         print(f"\nAre you sure to delete {user}?")
                         print("1. YES")
                         print("2. NO")
                         choice = input("Choice : ")
                         if choice == '1':
+                            cursor.execute(f"DROP TRIGGER IF EXISTS semester_count_{year}")
+
                             cursor.execute(f"DELETE FROM {student_record} WHERE username = '{user}'")
                             db.commit()
+
+                            cursor.execute(
+                                f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {year})")
+
                             print(f"\n{user} has been removed from {student_record}\n")
 
                             cursor.execute(f"SELECT students + lat_students FROM students_batch WHERE start_year = {int(student_records[int(choice)-1][1])}")
@@ -1017,26 +1182,31 @@ def admin_session():
                             cursor.execute(
                                 f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(student_records[int(choice)-1][1])}")
                             db.commit()
-
                         else:
-                            print("\nGoing back\n")
+                            print("\nGoing back...\n")
                             continue
+                    else:
+                        print("\nInvalid choice, going back...\n")
+                        continue
 
-                else:
-                    print("\nGoing back\n")
+                elif choice == '4':
+                    print("Going back...\n")
                     break
 
+                else:
+                    print("Enter a valid option...\n")
+
         elif choice == '6':
-            print("Logging out\n")
+            print("Logging out...\n")
             break
 
         else:
-            print("Enter valid option\n")
+            print("Incorrect choice, enter valid choice...\n")
 
 
 def admin_auth():
     print("\nAdmin Login\n")
-    if input("\nEnter username : ") == 'admin' and input("Enter password : ") == '1234':
+    if input("Username : ") == 'admin' and stdiomask.getpass(prompt='Password : ') == '1234':
         admin_session()
     else:
         print("Invalid admin login details\n")
@@ -1065,5 +1235,5 @@ def main():
             break
 
 
-# war begins
+# war begins, ionia calls. hasagi
 main()
