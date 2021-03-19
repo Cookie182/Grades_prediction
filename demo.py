@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression, LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec as gs
+from matplotlib.animation import FuncAnimation
 plt.style.use('bmh')  # matplotlib graph style
 sns.set_style('dark')  # seaborn graph style
 warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
@@ -181,41 +182,43 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     cursor.execute(f"DESCRIBE {record}_{subject}")
     tests = [x[0] for x in cursor.fetchall()][1:-4]
 
-    fig = plt.figure(figsize=(14, 7))
-    grid = gs(nrows=1, ncols=2, figure=fig)
+    fig = plt.figure(figsize=(10, 5))
+    grid = gs(nrows=2, ncols=2, figure=fig)
     plt.suptitle(
-        f'Chance of Passing and Predicted Total Grade for {subject}\nBe warned, these numbers are not supposed to be an extremely accurate representation of your future')
-
-    ax1 = fig.add_subplot(grid[:1])
+        f'Chance of Passing and Predicted Total Grade for {subject}\nBe warned, these numbers are not supposed to be an extremely accurate representation of your future', fontsize=12)
+    ax1 = fig.add_subplot(grid[0, 0])
     plt.title(f"Probability of passing the subject after each test taken\nPredicted Pass or Fail? -> {pf}\
-    \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=14)
-    plt.plot(tests, pass_probabs, c='black', linestyle='--', label='Predicted passing chance')
+    \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=12)
+    # plt.plot(tests, pass_probabs, c='black', linestyle='--', label='Predicted passing chance')
     plt.axhline(50, color='r', label="Threshold")
-    plt.xticks(rotation=45)
+    plt.xticks(fontsize=8, rotation=45)
     plt.ylabel('Probability (%)')
     plt.ylim(ymin=50-limit1, ymax=50+limit1)
     plt.margins(0.02, 0.02)
     plt.legend(loc='best')
     plt.tight_layout()
 
-    ax2 = fig.add_subplot(grid[1:])
-    plt.title(f"Predicting Overall grade after each test\nPredicted Overall Subject Grade -> {grade_p:.2f}%\
-    \nPredicted Grade -> {grade}",
-              fontsize=14)
-    plt.plot(tests, total_percent, c='black', linestyle='--', label='Predicted Overall grade')
+    ax2 = fig.add_subplot(grid[0, 1])
+    plt.title(f"Predicting Overall grade after each test\nPredicted Overall Subject Grade -> {grade_p:.2f}%\nPredicted Grade -> {grade}", fontsize=12)
     plt.axhline(60, color='r', label='Passing Threshold')
-    plt.xticks(rotation=45)
+    plt.xticks(fontsize=8, rotation=45)
     plt.ylabel('Final Grade')
     plt.margins(x=0.01, y=0.01)
     plt.ylim(ymin=60-limit2, ymax=60+limit2)
     plt.margins(0.02, 0.02)
     plt.legend(loc='best')
     plt.tight_layout()
+
+    ax3 = fig.add_subplot(grid[1, :])
+    plt.plot(tests, pass_probabs)
+
+    def build(i):
+        ax1.plot(tests[:i], pass_probabs[:i], c='black', label='Predicted Passing Chance')
+        ax2.plot(tests[:i], total_percent[:i], c='black', label='Predicted Overall Grade')
+    animator = FuncAnimation(fig, build, interval=200, frames=1000000, repeat=True)
     plt.show()
-
+    # milou
     print("\nDetailed predictions for marks shown\n")
-
-# milou
 
 
 def student_session(record, user):
