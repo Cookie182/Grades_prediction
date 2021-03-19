@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression, LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec as gs
-from matplotlib.animation import FuncAnimation
+from scipy.signal import savgol_filter
 plt.style.use('bmh')  # matplotlib graph style
 sns.set_style('dark')  # seaborn graph style
 warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
@@ -136,6 +136,8 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
 
 
 def rolling_predict(marks, subject, record):  # to present rolling predictions based on a student's marks
+    all_marks = marks  # saved to calculate rolling actual grade (calculated with subject structure details)
+    marks = np.array(marks[:-1]).reshape(1, -1)  # prepping data to be used for predictions
     # loading subject prediction models
     passfail = pickle.load(open(f"{path}/{subject}_passfail", 'rb'))
     overallgrade = pickle.load(open(f"{path}/{subject}_overallgrade", 'rb'))
@@ -145,6 +147,12 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     for x in range(len(marks[0])):
         dummy[x] = marks[0][x]
         pass_probabs.append(passfail.predict_proba(np.array([dummy]))[0][1] * 100)
+
+    # interpolating results to give a smoother graph
+    pass_probabs_l = len(pass_probabs)
+    if pass_probabs_l % 2 == 0:
+        pass_probabs_l -= 1
+    pass_probabs = savgol_filter(pass_probabs, pass_probabs_l, 4)
 
     limit1 = math.ceil(max([abs(x - 50) for x in pass_probabs]))  # limits determiend to scale the pass/fail graph better
 
@@ -160,13 +168,20 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
         dummy[x] = marks[0][x]
         total_percent.append(round(overallgrade.predict(np.array(dummy).reshape(1, -1))[0]*100, 3))
 
+    # interpolating results to give a smoother graph
+    total_percent_l = len(total_percent)
+    if total_percent_l % 2 == 0:
+        total_percent_l -= 1
+
+    total_percent = savgol_filter(total_percent, total_percent_l, 4)
+
     limit2 = math.ceil(max([abs(x-60) for x in total_percent]))  # limits determined to scale the overall grade graph better
 
     # calculating grade
     grade_p = overallgrade.predict(marks)[0]*100
     grade = None
     if grade_p >= 90:
-        grade = "A+"
+        grade = "A+"  # milou
     elif grade_p >= 80:
         grade = "A"
     elif grade_p >= 70:
@@ -178,46 +193,99 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     else:
         grade = "F"
 
+    # calculating the rolling actual grade depending on subject structure
+    dummy = [0] * len(all_marks)
+    actual_grades = []
+    for x in range(len(all_marks)):
+        dummy[x] = all_marks[x]
+        cursor.execute(f"SELECT Amount FROM {subject}_details")
+        amounts = [int(x[0]) for x in cursor.fetchall()]
+
+        cursor.execute(f"SELECT Weightage FROM {subject}_details")
+        weightages = [float(x[0]) for x in cursor.fetchall()]
+
+        cursor.execute(f"SELECT Max_mark FROM {subject}_details")
+        max_marks = [int(x[0]) for x in cursor.fetchall()]
+
+        # calculating rolling actual grade of student
+        mults = []
+        c = 0
+        for x in range(len(amounts)):
+            for y in range(amounts[x]):
+                mults.append((dummy[c] / max_marks[x]) * (weightages[x] / amounts[x]))
+                c += 1
+        mults = [np.round(x*100, 2) for x in mults]
+        p_grade = np.sum(mults)
+        actual_grades.append(p_grade)
+
+    # interpolating results to give a smoother graph
+    actual_grades_l = len(actual_grades)
+    if actual_grades_l % 2 == 0:
+        actual_grades_l -= 1
+
+    actual_grades = savgol_filter(actual_grades, actual_grades_l, 4)
+
+    limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))  # limits determined to scale the overall grade graph better
+
+    actual_grade = None
+    if actual_grades[-1] >= 90:
+        actual_grade = "A+"  # milou
+    elif actual_grades[-1] >= 80:
+        actual_grade = "A"
+    elif actual_grades[-1] >= 70:
+        actual_grade = "B"
+    elif actual_grades[-1] >= 60:
+        actual_grade = "C"
+    elif actual_grades[-1] >= 50:
+        actual_grade = "D"
+    else:
+        actual_grade = "F"
+
     # getting the name of tests used for predictions
     cursor.execute(f"DESCRIBE {record}_{subject}")
-    tests = [x[0] for x in cursor.fetchall()][1:-4]
+    tests = [x[0] for x in cursor.fetchall()][1:-3]
 
-    fig = plt.figure(figsize=(10, 5))
+    fig = plt.figure(f"Grade prediction and calculation for {subject}", figsize=(10, 5))
     grid = gs(nrows=2, ncols=2, figure=fig)
     plt.suptitle(
-        f'Chance of Passing and Predicted Total Grade for {subject}\nBe warned, these numbers are not supposed to be an extremely accurate representation of your future', fontsize=12)
+        f"Chance of Passing and Predicted Total Grade for {subject}\nTake the predictions with a grain of salt", fontsize=12)
     ax1 = fig.add_subplot(grid[0, 0])
     plt.title(f"Probability of passing the subject after each test taken\nPredicted Pass or Fail? -> {pf}\
-    \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=12)
-    # plt.plot(tests, pass_probabs, c='black', linestyle='--', label='Predicted passing chance')
-    plt.axhline(50, color='r', label="Threshold")
+    \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=11)
+    plt.axhline(50, color='r', label="Threshold", linestyle='--')
+    plt.plot(tests[:-1], pass_probabs, c='blue', lw=1, label='Predicted passing chance')
+    plt.yticks(fontsize=8)
     plt.xticks(fontsize=8, rotation=45)
-    plt.ylabel('Probability (%)')
+    plt.ylabel('Probability (%)', fontsize=9)
     plt.ylim(ymin=50-limit1, ymax=50+limit1)
     plt.margins(0.02, 0.02)
-    plt.legend(loc='best')
+    plt.legend(loc='best', fontsize=7)
     plt.tight_layout()
 
     ax2 = fig.add_subplot(grid[0, 1])
-    plt.title(f"Predicting Overall grade after each test\nPredicted Overall Subject Grade -> {grade_p:.2f}%\nPredicted Grade -> {grade}", fontsize=12)
-    plt.axhline(60, color='r', label='Passing Threshold')
+    plt.title(f"Predicting Overall grade after each test\nPredicted Overall Subject Grade -> {grade_p:.2f}%\nPredicted Grade -> {grade}", fontsize=11)
+    plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
+    plt.plot(tests[:-1], total_percent, c='blue', lw=1, label='Predicted Overall Grade')
+    plt.yticks(fontsize=8)
     plt.xticks(fontsize=8, rotation=45)
-    plt.ylabel('Final Grade')
+    plt.ylabel('Final Grade', fontsize=9)
     plt.margins(x=0.01, y=0.01)
     plt.ylim(ymin=60-limit2, ymax=60+limit2)
-    plt.margins(0.02, 0.02)
-    plt.legend(loc='best')
+    plt.legend(loc='best', fontsize=7)
     plt.tight_layout()
 
     ax3 = fig.add_subplot(grid[1, :])
-    plt.plot(tests, pass_probabs)
-
-    def build(i):
-        ax1.plot(tests[:i], pass_probabs[:i], c='black', label='Predicted Passing Chance')
-        ax2.plot(tests[:i], total_percent[:i], c='black', label='Predicted Overall Grade')
-    animator = FuncAnimation(fig, build, interval=200, frames=1000000, repeat=True)
+    plt.title(f"Actual Rolling Total Mark (out of 100) calculated for {subject} -> {actual_grades[-1]} ({actual_grade})", fontsize=11)
+    plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
+    plt.plot(tests, actual_grades, c='blue', lw=1, label='Caculated Grade (After each test)')
+    plt.yticks(fontsize=8)
+    plt.xticks(fontsize=8, rotation=45)
+    plt.ylabel('Grade (out of 100)', fontsize=9)
+    plt.margins(x=0.01, y=0.01)
+    plt.legend(loc='best', fontsize=7)
+    plt.ylim(ymin=60-limit3, ymax=60+limit3)
+    plt.tight_layout()
     plt.show()
-    # milou
     print("\nDetailed predictions for marks shown\n")
 
 
@@ -253,11 +321,10 @@ def student_session(record, user):
                 choice = input("Choice : ")
                 if choice == '1':
                     cursor.execute(f"DESCRIBE {record}_{subject}")
-                    tests = [x[0] for x in cursor.fetchall()][1:-4]
+                    tests = [x[0] for x in cursor.fetchall()][1:-3]
                     for test in tests:  # iterating and getting marks for tests except for the final test
                         cursor.execute(f"SELECT {test} FROM {record}_{subject} WHERE student_id = {id}")
                         marks.append(cursor.fetchall()[0][0])
-                    marks = np.array(marks).reshape(1, -1)  # prepping data to be used for predictions
                     rolling_predict(marks, subject, record)
                     print(f"\nMarks displayed for {user} in {subject}\n")
                 else:
@@ -410,8 +477,6 @@ def teacher_session(teacher_id):
                             # update mark of each student
                             cursor.execute(f"UPDATE {record}_{subject} SET {test} = {mark} WHERE student_id = {id}")
                             db.commit()
-
-                        """THERE WAS SOMETHING STRANGE THAT I ENCOUNTERED HERE WHERE BOTH THE THINGS OPERATIONS IN THE 2 "FOR ID IN IDS" LOOPS CANNOT BE DONE UNDER ONE OF THESE LOOPS AND INSTEAD HAD TO BE DONE SEPERATELY UNDER ITS OWN LOOP"""
 
                         for id in ids:
                             cursor.execute(f"DESCRIBE {record}_{subject}")
