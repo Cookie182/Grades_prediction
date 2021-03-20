@@ -15,16 +15,17 @@ from sklearn.linear_model import LinearRegression, LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec as gs
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter  # add filler data to smoothen out lines on graphs
 plt.style.use('bmh')  # matplotlib graph style
 sns.set_style('dark')  # seaborn graph style
 warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
 
 
 """ MAKE SURE THE DATABASE DETAILS ARE CORRECT FOR YOU """
+database = 'btechcse'  # name of course
 course_len = 4  # how many years is the course
-path = "C:/ProgramData/MySQL/MySQL Server 8.0/Data/btechcse"  # path to database and to store prediction models
-db = mysql.connect(host='localhost', user='Ashwin', password='3431', database="btechcse")  # initializing connection to database
+path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"  # path to database and to store prediction models
+db = mysql.connect(host='localhost', user='Ashwin', password='3431', database=database)  # initializing connection to database
 cursor = db.cursor(buffered=True)  # cursor
 
 
@@ -33,47 +34,69 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
     df = pd.DataFrame(index=range(1, n+1))  # making the dataframe and generating dummy marks
     df.index.name = 'Student'
     print("\nGenerating mock data\n")
-    for x in range(len(test_type)):
-        m = max_mark[x]  # storing max marks for each type of test
-        if test_amount[x] > 1:  # generating random marks in marking range with a gaussian weight distribution to each mark
-            # mew = 65% of max mark and sigma = a third of max mark
-            for y in range(1, test_amount[x] + 1):
-                df[f"{test_type[x]} {y}"] = [round(x) for x in (ss.truncnorm.rvs(((0 - int(m * 0.65)) / (m//3)),
+
+    passfail_final, overallgrade_final = None, None
+    passfail_final_acc, overallgrade_final_acc = 0, 0
+    for test_run in range(1, 6):  # generating mock data 5 times to find the models with the higehst accuracy
+        print(f"\nTest Run {test_run}\n")
+        for x in range(len(test_type)):
+            m = max_mark[x]  # storing max marks for each type of test
+            if test_amount[x] > 1:  # generating random marks in marking range with a gaussian weight distribution to each mark
+                # mew = 65% of max mark and sigma = a third of max mark
+                for y in range(1, test_amount[x] + 1):
+                    df[f"{test_type[x]} {y}"] = [round(x) for x in (ss.truncnorm.rvs(((0 - int(m * 0.65)) / (m//3)),
+                                                                                     ((m - int(m * 0.65)) / (m//3)),
+                                                                                     loc=round(m * 0.65, 0), scale=(m//3), size=n))]
+            else:
+                for y in range(1, test_amount[x] + 1):
+                    df[f"{test_type[x]}"] = [round(x) for x in (ss.truncnorm.rvs(((0 - int(m * 0.65)) / (m//3)),
                                                                                  ((m - int(m * 0.65)) / (m//3)),
                                                                                  loc=round(m * 0.65, 0), scale=(m//3), size=n))]
-        else:
-            for y in range(1, test_amount[x] + 1):
-                df[f"{test_type[x]}"] = [round(x) for x in (ss.truncnorm.rvs(((0 - int(m * 0.65)) / (m//3)),
-                                                                             ((m - int(m * 0.65)) / (m//3)),
-                                                                             loc=round(m * 0.65, 0), scale=(m//3), size=n))]
 
-    # calculating total grade weight weightage
-    df['Total %'] = [0] * len(df)
-    for x in range(len(test_type)):
-        df['Total %'] += round((df.filter(regex=test_type[x]).sum(axis=1) / (test_amount[x] * max_mark[x])) * weightage[x], 2)
+        # calculating total grade weight weightage
+        df['Total %'] = [0] * len(df)
+        for x in range(len(test_type)):
+            df['Total %'] += round((df.filter(regex=test_type[x]).sum(axis=1) / (test_amount[x] * max_mark[x])) * weightage[x], 2)
 
-    # determining pass/fail
-    df['Pass/Fail'] = ["Pass" if x >= pass_percent else "Fail" for x in df['Total %']]
-    print("Generated mock data!\n")
+        # determining pass/fail
+        df['Pass/Fail'] = ["Pass" if x >= pass_percent else "Fail" for x in df['Total %']]
+        print("Generated mock data!\n")
 
-    print(f"\nStudents passed -> {len(df[df['Pass/Fail'] == 'Pass'])}\
-    \nStudents Failed -> {len(df[df['Pass/Fail'] == 'Fail'])}\n")
+        print(f"\nStudents passed -> {len(df[df['Pass/Fail'] == 'Pass'])}\
+        \nStudents Failed -> {len(df[df['Pass/Fail'] == 'Fail'])}\n")
 
-    X = df.drop(['Pass/Fail', 'Total %', final_test_name], axis=1)
-    y = df[['Pass/Fail', 'Total %']].copy()
-    y['Pass/Fail'] = LabelEncoder().fit_transform(y['Pass/Fail'])
+        X = df.drop(['Pass/Fail', 'Total %', final_test_name], axis=1)
+        y = df[['Pass/Fail', 'Total %']].copy()
+        y['Pass/Fail'] = LabelEncoder().fit_transform(y['Pass/Fail'])
 
-    print("Creating and fitting models\n")
-    # making train and test data for models
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y['Pass/Fail'])
+        print("Creating and fitting models\n")
+        # making train and test data for models
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y['Pass/Fail'])
 
-    # passing probability predictor
-    passfail = make_pipeline(StandardScaler(),
-                             LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
-                                                  cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
-                                                  max_iter=1000, n_jobs=-1, refit=True,
-                                                  random_state=7,
-                                                  class_weight='balanced')).fit(X_test, y_test['Pass/Fail'])
+        # passing probability predictor
+        passfail = make_pipeline(StandardScaler(),
+                                 LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
+                                                      cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
+                                                      max_iter=1000, n_jobs=-1, refit=True,
+                                                      random_state=7,
+                                                      class_weight='balanced')).fit(X_test, y_test['Pass/Fail'])
+
+        # final overall grade predictor
+        overallgrade = make_pipeline(StandardScaler(), LinearRegression(n_jobs=-1)).fit(X_test, y_test['Total %'])
+        print("Models created")
+
+        pf_score = np.round(passfail.score(X_test, y_test['Pass/Fail'])*100, 2)
+        og_score = np.round(overallgrade.score(X_test, y_test['Total %'])*100, 2)
+        print("LogisticRegressionCV classifer:-")
+        print(f"Accuracy -> {pf_score}%")
+        print(f"f1_score -> {np.round(f1_score(y_test['Pass/Fail'], passfail.predict(X_test))*100, 2)}%\n")
+
+        print("LinearRegression regressor:-")
+        print(f"Accuracy -> {og_score}%")
+        print("Models created\n")
+
+        if (pf_score > passfail_final_acc) and (og_score > overallgrade_final_acc):
+            passfail_final, overallgrade_final = passfail, overallgrade
 
     if graphs == True:
         for x in range(len(test_type)):
@@ -119,20 +142,9 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
         plt.rcParams.update({'font.size': 18})
         ax.set_title('Confusion Matrix')
         plt.show()
+        print(' ')
 
-    # final overall grade predictor
-    overallgrade = make_pipeline(StandardScaler(), LinearRegression(n_jobs=-1)).fit(X_test, y_test['Total %'])
-    print("Models created")
-
-    print("LogisticRegressionCV classifer:-")
-    print(f"Accuracy -> {round(passfail.score(X_test, y_test['Pass/Fail'])*100, 2)}%")
-    print(f"f1_score -> {round(f1_score(y_test['Pass/Fail'], passfail.predict(X_test))*100, 2)}%\n")
-
-    print("LinearRegression regressor:-")
-    print(f"Accuracy -> {round(overallgrade.score(X_test, y_test['Total %'])*100, 2)}%")
-    print("Models created")
-
-    return passfail, overallgrade
+    return passfail_final, overallgrade_final
 
 
 def rolling_predict(marks, subject, record):  # to present rolling predictions based on a student's marks
@@ -216,8 +228,9 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
                 c += 1
         mults = [np.round(x*100, 2) for x in mults]
         p_grade = np.sum(mults)
-        actual_grades.append(p_grade)
+        actual_grades.append(np.round(p_grade, 2))
 
+    actual_calc_grade = actual_grades[-1]
     # interpolating results to give a smoother graph
     actual_grades_l = len(actual_grades)
     if actual_grades_l % 2 == 0:
@@ -263,7 +276,8 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     plt.tight_layout()
 
     ax2 = fig.add_subplot(grid[0, 1])
-    plt.title(f"Predicting Overall grade after each test\nPredicted Overall Subject Grade -> {grade_p:.2f}%\nPredicted Grade -> {grade}", fontsize=11)
+    plt.title(
+        f"Predicting Overall grade after each test\nPredicted Overall Subject Grade (out of 100)-> {grade_p:.2f}\nPredicted Grade -> {grade}", fontsize=11)
     plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
     plt.plot(tests[:-1], total_percent, c='blue', lw=1, label='Predicted Overall Grade')
     plt.yticks(fontsize=8)
@@ -275,7 +289,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     plt.tight_layout()
 
     ax3 = fig.add_subplot(grid[1, :])
-    plt.title(f"Actual Rolling Total Mark (out of 100) calculated for {subject} -> {actual_grades[-1]} ({actual_grade})", fontsize=11)
+    plt.title(f"Actual Rolling Total Mark (out of 100) calculated for {subject} -> {actual_calc_grade} ({actual_grade})", fontsize=11)
     plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
     plt.plot(tests, actual_grades, c='blue', lw=1, label='Caculated Grade (After each test)')
     plt.yticks(fontsize=8)
@@ -414,7 +428,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
+                cursor.execute(f"SHOW TABLES WHERE tables_in_{database} LIKE 'students_%' AND tables_in_{database} NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -444,7 +458,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
+                cursor.execute(f"SHOW TABLES WHERE tables_in_{database} LIKE 'students_%' AND tables_in_{database} NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -577,7 +591,7 @@ def teacher_session(teacher_id):
             if int(choice) in [x[0] for x in subjects]:
                 print("")
                 subject = subjects[int(choice)-1][1]
-                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
+                cursor.execute(f"SHOW TABLES WHERE tables_in_{database} LIKE 'students_%' AND tables_in_{database} NOT LIKE 'students_batch'")
                 # choosing for which batch to edit marks for
                 records = list(enumerate([x[0] for x in cursor.fetchall() if len(x[0]) < 15], start=1))
                 print("Choose student batch\n")
@@ -843,110 +857,110 @@ def admin_session():
                         subj_name = input("Enter abbreviation of subject : ").strip()
 
                         if subj_name not in subject_names:
-                            try:
-                                full_name = input("Enter full name of subject : ").strip()
-                                semester = int(input("Which semester is this subject in : "))
-                                teach = int(input("Enter teacher ID for this subject : "))
-                                cursor.execute(f"INSERT INTO subjects VALUES ('{subj_name}', '{full_name}', {semester}, {teach})")
+                            # try:
+                            full_name = input("Enter full name of subject : ").strip()
+                            semester = int(input("Which semester is this subject in : "))
+                            teach = int(input("Enter teacher ID for this subject : "))
+                            cursor.execute(f"INSERT INTO subjects VALUES ('{subj_name}', '{full_name}', {semester}, {teach})")
+                            db.commit()
+
+                            table_name = f"{subj_name}_details"
+                            # type of evaluations
+                            test_type = tuple(input("\nEnter the types of tests (seperated by a space): ").split())
+                            print(" ")
+                            test_amount = tuple(int(input(f"How many tests for {x}?: "))
+                                                for x in test_type)  # amount of tests per evaluation
+                            print(" ")
+                            max_mark = tuple(int(input(f"{x} out of how many marks?: "))
+                                             for x in test_type)  # maximum marks for each type of tests
+                            print(" ")
+
+                            while True:
+                                weightage = tuple(float(input(f"What is the weightage for {x}?: "))/100 for x in test_type)
+                                if np.sum(weightage) == 1.0:
+                                    print(" ")
+                                    break
+                                else:
+                                    print("Make sure the weightage for all tests add up to 1.0!\n")
+                            pass_percent = float(input("What is the passing percentage threshold?: "))/100
+
+                            final_test_name = test_type[-1]
+                            cursor.execute(
+                                f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
+                            db.commit()
+
+                            passfail, overallgrade = grades(test_type, test_amount, max_mark,
+                                                            weightage, pass_percent, final_test_name)
+
+                            with open(f"{path}/{subj_name}_passfail", 'wb') as f:
+                                pickle.dump(passfail, f)
+
+                            with open(f"{path}/{subj_name}_overallgrade", 'wb') as f:
+                                pickle.dump(overallgrade, f)
+
+                            # inserting details about new subject
+                            for x in [tuple((test_type[x], test_amount[x], weightage[x], max_mark[x])) for x in range(len(test_type))]:
+                                cursor.execute(f"INSERT INTO {table_name} VALUES ('{x[0]}', {x[1]}, {x[2]}, {x[3]})")
                                 db.commit()
 
-                                table_name = f"{subj_name}_details"
-                                # type of evaluations
-                                test_type = tuple(input("\nEnter the types of tests (seperated by a space): ").split())
-                                print(" ")
-                                test_amount = tuple(int(input(f"How many tests for {x}?: "))
-                                                    for x in test_type)  # amount of tests per evaluation
-                                print(" ")
-                                max_mark = tuple(int(input(f"{x} out of how many marks?: "))
-                                                 for x in test_type)  # maximum marks for each type of tests
-                                print(" ")
+                            print(f"Details for {full_name} added\n")
 
-                                while True:
-                                    weightage = tuple(float(input(f"What is the weightage for {x}?: "))/100 for x in test_type)
-                                    if np.sum(weightage) == 1.0:
-                                        print(" ")
-                                        break
-                                    else:
-                                        print("Make sure the weightage for all tests add up to 1.0!\n")
-                                pass_percent = float(input("What is the passing percentage threshold?: "))/100
+                            # getting all student record tables for all years
+                            cursor.execute(f"SHOW TABLES WHERE tables_in_{database} LIKE 'students_%' AND tables_in_{database} NOT LIKE 'students_batch'")
+                            tables = [x[0] for x in cursor.fetchall()]
+                            if len(tables) > 0:
+                                # making marking sheets for subjects for all students who have a student record
+                                for table in tables:
+                                    new_table = f"{table}_{subj_name}"
+                                    tests = []
+                                    cursor.execute(f"SELECT type, amount FROM {table_name}")
+                                    # getting the column names of tests for subject
+                                    for x in cursor.fetchall():
+                                        if x[1] > 1:
+                                            for y in range(1, x[1]+1):
+                                                tests.append(f"{x[0]}_{y}")
+                                        else:
+                                            tests.append(x[0])
 
-                                final_test_name = test_type[-1]
-                                cursor.execute(
-                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
-                                db.commit()
-
-                                passfail, overallgrade = grades(test_type, test_amount, max_mark,
-                                                                weightage, pass_percent, final_test_name)
-
-                                with open(f"{path}/{subj_name}_passfail", 'wb') as f:
-                                    pickle.dump(passfail, f)
-
-                                with open(f"{path}/{subj_name}_overallgrade", 'wb') as f:
-                                    pickle.dump(overallgrade, f)
-
-                                # inserting details about new subject
-                                for x in [tuple((test_type[x], test_amount[x], weightage[x], max_mark[x])) for x in range(len(test_type))]:
-                                    cursor.execute(f"INSERT INTO {table_name} VALUES ('{x[0]}', {x[1]}, {x[2]}, {x[3]})")
+                                    # creating new mark sheet for students doing that particular subject
+                                    cursor.execute(f"CREATE TABLE {new_table} (student_id INT(5) PRIMARY KEY)")
                                     db.commit()
 
-                                print(f"Details for {full_name} added\n")
+                                    # adding foreign key to link student ids together
+                                    cursor.execute(
+                                        f"ALTER TABLE {new_table} ADD FOREIGN KEY (student_id) REFERENCES {table}(id) ON DELETE CASCADE ON UPDATE CASCADE")
+                                    db.commit()
 
-                                # getting all student record tables for all years
-                                cursor.execute("SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch'")
-                                tables = [x[0] for x in cursor.fetchall()]
-                                if len(tables) > 0:
-                                    # making marking sheets for subjects for all students who have a student record
-                                    for table in tables:
-                                        new_table = f"{table}_{subj_name}"
-                                        tests = []
-                                        cursor.execute(f"SELECT type, amount FROM {table_name}")
-                                        # getting the column names of tests for subject
-                                        for x in cursor.fetchall():
-                                            if x[1] > 1:
-                                                for y in range(1, x[1]+1):
-                                                    tests.append(f"{x[0]}_{y}")
-                                            else:
-                                                tests.append(x[0])
-
-                                        # creating new mark sheet for students doing that particular subject
-                                        cursor.execute(f"CREATE TABLE {new_table} (student_id INT(5) PRIMARY KEY)")
+                                    # adding columns of tests and making the default marks 0
+                                    for test in tests:
+                                        cursor.execute(f"ALTER TABLE {new_table} ADD {test} INT(3) NOT NULL DEFAULT 0")
                                         db.commit()
 
-                                        # adding foreign key to link student ids together
-                                        cursor.execute(
-                                            f"ALTER TABLE {new_table} ADD FOREIGN KEY (student_id) REFERENCES {table}(id) ON DELETE CASCADE ON UPDATE CASCADE")
+                                    # custom columns to store predictor variables
+                                    cursor.execute(f"ALTER TABLE {new_table} ADD PASS_CHANCE FLOAT NOT NULL DEFAULT 0")
+                                    db.commit()
+                                    cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                                    db.commit()
+                                    cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                                    db.commit()
+
+                                    # adding each student id for each student record table and this subject
+                                    cursor.execute(f"SELECT id FROM {table}")
+                                    for x in [x[0] for x in cursor.fetchall()]:
+                                        cursor.execute(f"INSERT INTO {new_table} (student_id) VALUES ({x})")
                                         db.commit()
 
-                                        # adding columns of tests and making the default marks 0
-                                        for test in tests:
-                                            cursor.execute(f"ALTER TABLE {new_table} ADD {test} INT(3) NOT NULL DEFAULT 0")
-                                            db.commit()
+                                    cursor.execute(
+                                        f"CREATE TRIGGER {new_table} AFTER INSERT ON {table} FOR EACH ROW INSERT INTO {new_table} (student_id) values (new.id)")
+                                    db.commit()
 
-                                        # custom columns to store predictor variables
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD PASS_CHANCE FLOAT NOT NULL DEFAULT 0")
-                                        db.commit()
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
-                                        db.commit()
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
-                                        db.commit()
-
-                                        # adding each student id for each student record table and this subject
-                                        cursor.execute(f"SELECT id FROM {table}")
-                                        for x in [x[0] for x in cursor.fetchall()]:
-                                            cursor.execute(f"INSERT INTO {new_table} (student_id) VALUES ({x})")
-                                            db.commit()
-
-                                        cursor.execute(
-                                            f"CREATE TRIGGER {new_table} AFTER INSERT ON {table} FOR EACH ROW INSERT INTO {new_table} (student_id) values (new.id)")
-                                        db.commit()
-
-                                    print(f"Grades sheets for {subj_name} created\n")
-                                else:
-                                    print("No student record tables found...\n")
-                            except:
-                                cursor.execute("DELETE FROM subjects WHERE id = %s", (subj_name,))
-                                db.commit()
-                                print("Enter valid subject details...\n")
+                                print(f"Grades sheets for {subj_name} created\n")
+                            else:
+                                print("No student record tables found...\n")
+                            # except:
+                            #     cursor.execute("DELETE FROM subjects WHERE id = %s", (subj_name,))
+                            #     db.commit()
+                            #     print("Enter valid subject details...\n")
                         else:
                             print(f"{subj_name} already exists in the subjects table...\n")
                     else:
@@ -970,16 +984,19 @@ def admin_session():
                             cursor.execute("DELETE FROM subjects WHERE id = %s", (subject,))
                             db.commit()
 
-                            cursor.execute(f"SHOW TABLES LIKE '%{subject}%'")
-                            tables = [x[0] for x in cursor.fetchall()]
-                            if len(tables) > 0:
-                                for table in tables:
-                                    cursor.execute(f"DROP TABLE {table}")
-                                    db.commit()
-
-                            cursor.execute(f"SHOW TABLES WHERE tables_in_btechcse LIKE 'students_%' AND tables_in_btechcse NOT LIKE 'students_batch''")
-                            records = [x[0] for x in cursor.fetchall() if len(x[0]) < 15]
+                            cursor.execute(f"SHOW TABLES WHERE tables_in_{database} LIKE 'students_%' AND tables_in_{database} NOT LIKE 'students_batch'")
+                            records = [x[0] for x in cursor.fetchall()]
                             for record in records:
+                                cursor.execute(f"DROP TABLE IF EXISTS {record}_{subject}")
+                                db.commit()
+
+                                cursor.execute(f"SHOW TABLES LIKE '%{subject}%'")
+                                tables = [x[0] for x in cursor.fetchall()]
+                                if len(tables) > 0:
+                                    for table in tables:
+                                        cursor.execute(f"DROP TABLE {table}")
+                                        db.commit()
+
                                 cursor.execute(f"DROP TRIGGER IF EXISTS {record}_{subject}")
                                 db.commit()
 
@@ -1303,5 +1320,5 @@ def main():
             break
 
 
-# war begins, ionia calls. hasagi
+# war begins, ionia calls. hasagi\
 main()
