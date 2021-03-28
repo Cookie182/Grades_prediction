@@ -41,13 +41,13 @@ warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
         "- THE 3 MAIN PREQUISITE TABLES, AS SHOWN IN THE FIRST OPTION IN THE ADMIN MENU (IT IS AUTOMATICALLY DONE AS SOON AS THE OPTION IS SELECTED TO RUN), ARE A MUST HAVE REQUIREMENT BEFORE CONDUCTING ANY TYPE OF OPERATIONS"
 """
 
-""" MAKE SURE THE DATABASE DETAILS ARE CORRECT FOR YOU """
-course = "B.Tech CSE"  # name of course
-database = 'btechcse'  # name of database
-course_len = 4  # how many years is the course
-path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"  # path to database and to store prediction models
-db = mysql.connect(host='localhost', user='Ashwin', password='3431', database=database)  # initializing connection to database
-cursor = db.cursor(buffered=True)  # cursor
+""" MAKE SURE THE DATABASE DETAILS, SQL DETAILS AND PATH DETAILS ARE CORRECT FOR YOU NEAR THE END"""
+# course = "B.Tech CSE"  # name of course
+# database = 'btechcse'  # name of database
+# course_len = 4  # how many years is the course
+# path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"  # path to database and to store prediction models
+# db = mysql.connect(host='localhost', user='Ashwin', password='3431', database=database)  # initializing connection to database
+# cursor = db.cursor(buffered=True)  # cursor
 
 
 def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test_name, n=1000, graphs=False):  # grades generator
@@ -179,7 +179,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     dummy = [0] * len(marks[0])  # making dummy list to cummulatively add each test score
     pass_probabs = []  # to store each probability as each test score gets entered
     for x in range(len(marks[0])):
-        dummy[x] = marks[0][x]
+        dummy[x] = marks[0][x]  # blink
         pass_probabs.append(passfail.predict_proba(np.array([dummy]))[0][1] * 100)
 
     # interpolating results to give a smoother graph
@@ -193,7 +193,6 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     pf = None  # predicting if in the end the model predicts student failing or passing
     if passfail.predict(marks) == 0:
         pf = 'Fail'
-        # blink
     else:
         pf = 'Pass'
 
@@ -330,41 +329,41 @@ def student_session(record, user):
     os.system('cls')
     while True:
         cursor.execute(f"SELECT first_name FROM {record} WHERE username = '{user}'")
-        print(f"Welcome to the student menu, {cursor.fetchall()[0][0]}")
-        print("\n1. View grades")
-        print("2. View account details")
-        print("3. Change account details")
-        print("4. Logout")
-        choice = input("Choice : ")
-        if choice == '1':  # view grades of a subject
+        print(f"Welcome to the student menu, {cursor.fetchall()[0][0]}\n")
+
+        print("What to do?\n")
+        choice = questionary.select("Choices: ", choices=["View grades",
+                                                          "Show predictions with custom grades",
+                                                          "View account details",
+                                                          "Change account details",
+                                                          "Logout"]).ask()
+        if choice == "View grades":  # view grades of a subject
             os.system('cls')
             print("Viewing your grades\n")
 
             # getting semester choice to display subjects in said semester
             cursor.execute(f"SELECT cur_semester FROM {record} WHERE username = '{user}'")
-            semesters = list(enumerate(range(1, int(cursor.fetchall()[0][0])+1), start=1))
-            try:
-                [print(f"{x[0]}. {x[1]}") for x in semesters]
-                choice = int(input("Which semester? : "))
-                semester = semesters[choice-1][1]
-            except:
-                print("No valid input about semester choice, going back...\n")
-                continue
+            semesters = [str(x) for x in range(1, int(cursor.fetchall()[0][0])+1)]
+            semesters.append("Go Back")
+
+            print("Which semester?\n")
+            semester = questionary.select("Choices: ", choices=semesters).ask()
             print(' ')
+
+            if semester == "Go Back":
+                os.system('cls')
+                print("Going back from viewing grades...\n")
+                continue
 
             # getting subjects that are in the specified semester
             cursor.execute(f"SELECT id, name FROM subjects WHERE semester = '{semester}'")
-            subjects = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-            [print(f"{x[0]}. {x[1]}") for x in subjects]  # choosing subject
-            print(f"{len(subjects)+1}. Go back")
-            try:
-                choice = int(input("Choice : "))
-            except:
-                os.system('cls')
-                print("Invalid input given, going back...\n")
+            subjects = [x[0] for x in cursor.fetchall()]
+            subjects.append("Go Back")
 
-            if int(choice) in [x[0] for x in subjects]:
-                subject = subjects[int(choice)-1][1]
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
                 cursor.execute(f"SELECT id FROM {record} WHERE username = '{user}'")
                 id = cursor.fetchall()[0][0]
                 cursor.execute(f"DESCRIBE {record}_{subject}")
@@ -375,10 +374,12 @@ def student_session(record, user):
                     print(f"{test} -> {cursor.fetchall()[0][0]}")
 
                 marks = []  # storing marks of student
-                print("\n1. View more info")  # to show prediction result graphs
-                print("2. Go back")
-                choice = input("Choice : ")
-                if choice == '1':
+
+                print("What to do?\n")
+                choice = questionary.select("Choices: ", choices=["View more info",
+                                                                  "Go Back"]).ask()
+
+                if choice == "View more info":  # to show prediction results graphs
                     cursor.execute(f"DESCRIBE {record}_{subject}")
                     tests = [x[0] for x in cursor.fetchall()][1:-3]
                     for test in tests:  # iterating and getting marks for tests except for the final test
@@ -392,10 +393,79 @@ def student_session(record, user):
                     print(f"Marks displayed for {user} in {subject}\n")
             else:
                 os.system('cls')
-                print("Incorrect choice for subjects\n")
+                print("Going back...\n")
                 continue
 
-        elif choice == '2':  # showing student account details
+        elif choice == "Show predictions with custom grades":  # taking custom grades for a subject and showing predictions based on them
+            os.system('cls')
+            print("Show predictions with custom grades\n")
+
+            # getting semester choice to display subjects in said semester
+            cursor.execute(f"SELECT cur_semester FROM {record} WHERE username = '{user}'")
+            semesters = [str(x) for x in range(1, int(cursor.fetchall()[0][0])+1)]
+            semesters.append("Go Back")
+
+            print("Which semester?\n")
+            semester = questionary.select("Choices: ", choices=semesters).ask()
+            print(' ')
+
+            if semester == "Go Back":
+                os.system('cls')
+                print("Going back from viewing custom grades...\n")
+                continue
+
+            # getting subjects that are in the specified semester
+            cursor.execute(f"SELECT id, name FROM subjects WHERE semester = '{semester}'")
+            subjects = [x[0] for x in cursor.fetchall()]
+            subjects.append("Go Back")
+
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
+                custom_marks = []  # storing custom marks entered by the student for a subject
+
+                # getting the test types, amount and max_marks for subject
+                cursor.execute(f"SELECT type, amount, max_mark FROM {subject}_details")
+                subj_details = [x for x in cursor.fetchall()]
+                for subj_detail in subj_details:
+                    type, amount, max_mark = subj_detail  # unpacking tuple values
+                    if amount < 2:  # if it is a test type with one evaluation
+                        while True:
+                            # making sure the user inputs are valid
+                            try:
+                                mark = int(input(f"Enter mark for {type} (Max: {max_mark}) -> "))
+                                if mark <= max_mark:
+                                    custom_marks.append(mark)
+                                    break
+                                else:
+                                    print(f"Mark must be below {max_mark} for {type}!\n")
+                            except:
+                                print("Enter valid input...\n")
+                    else:  # if it is a test type with multiple evaluations
+                        for x in range(1, amount+1):
+                            while True:
+                                try:
+                                    mark = int(input(f"Enter mark for {type} {x} (Max: {max_mark}) -> "))
+                                    if mark <= max_mark:
+                                        custom_marks.append(mark)
+                                        break
+                                    else:
+                                        print(f"Mark must be below {max_mark} for {type}\n")
+                                except:
+                                    print("Enter valid input...\n")
+
+                # getting predictions and producing graphs with the custom marks
+                rolling_predict(custom_marks, subject, record)
+                os.system('cls')
+                print(f"Custom marks displayed for {user} in {subject}\n")
+
+            else:
+                os.system('cls')
+                print("Going back...\n")
+                continue
+
+        elif choice == "View account details":  # showing student account details
             os.system('cls')
             print("Showing account details\n")
             cursor.execute(f"DESCRIBE {record}")
@@ -408,22 +478,17 @@ def student_session(record, user):
             os.system('cls')
             print(f"Account details for username {user} shown\n")
 
-        elif choice == '3':  # changing detail in student account
+        elif choice == "Change account details":  # changing detail in student account
             os.system('cls')
             print(f"Changing account details for {user}\n")
             cursor.execute(f"DESCRIBE {record}")
-            cols = list(enumerate([x[0] for x in cursor.fetchall() if x[0] not in ["id", "email", "username"]], start=1))
-            [print(f"{x[0]}. {x[1]}") for x in cols]
-            print(f"{len(cols)+1} Go back")
-            try:
-                choice = int(input("Choice : "))
-            except:
-                os.system('cls')
-                print("Invalid input given, going back...\n")
-                continue
+            cols = [x[0] for x in cursor.fetchall() if x[0] in ["first_name", "last_name", "mobile_no", "username", "password"]]
+            cols.append("Go Back")
 
-            if int(choice) in [x[0] for x in cols]:
-                col = cols[int(choice)-1][1]
+            print("Which detail to change?\n")
+            col = questionary.select("Choices: ", choices=cols).ask()
+
+            if col != "Go Back":
                 cursor.execute(f"SELECT {col} FROM {record} WHERE username = '{user}'")
                 old_detail = cursor.fetchall()[0][0]
                 new_detail = input(f"\nOld {col} -> {old_detail}\nEnter new {col} : ")
@@ -434,107 +499,92 @@ def student_session(record, user):
                 print(f"Account detail {col} changed from {old_detail} to {new_detail}\n")
             else:
                 os.system('cls')
-                print("Incorrect choice for account detail to change\n")
+                print("Going back...\n")
                 continue
 
-        elif choice == '4':
+        elif choice == "Logout":
             os.system('cls')
             print("Logging out from student menu\n")
             break
-
-        else:
-            os.system('cls')
-            print("Enter valid choice\n")
 
 
 def student_auth():
     os.system('cls')
     print("Student Login")
     cursor.execute("SELECT start_year FROM students_batch")
-    records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-    print("\nWhich record do you belong to?")
-    [print(f"{x[0]}. {x[1]}") for x in records]  # choosing which student record they belong to
-    try:
-        choice = int(input("Student record : "))
-        if int(choice) in [x[0] for x in records]:
-            record = f"students_{records[int(choice)-1][1]}"
-            user = input("Username : ")  # checking login details
-            passw = stdiomask.getpass(prompt='Password : ')
+    records = [str(x[0]) for x in cursor.fetchall()]
+    records.append("Go Back")
+    print("\nWhich record do you belong to?\n")
+    record = questionary.select("Choices: ", choices=records).ask()  # choosing which student record they belong to
+    if record != "Go Back":
+        record = f"students_{record}"
+        user = input("Username : ")  # checking login details
+        passw = stdiomask.getpass(prompt='Password : ')
 
-            valid_login = False
-            cursor.execute(f"SELECT username FROM {record}")  # gathering all the student usernames from selected student record
-            if user in [x[0] for x in cursor.fetchall()]:
-                cursor.execute(f"SELECT password FROM {record} WHERE username = '{user}'")
-                if passw == cursor.fetchall()[0][0]:
-                    cursor.execute(f"SELECT teacher_id FROM teachers WHERE username = '{user}'")
-                    valid_login = True
-                    student_session(record, user)  # launching student session
+        valid_login = False
+        cursor.execute(f"SELECT username FROM {record}")  # gathering all the student usernames from selected student record
+        if user in [x[0] for x in cursor.fetchall()]:
+            cursor.execute(f"SELECT password FROM {record} WHERE username = '{user}'")
+            if passw == cursor.fetchall()[0][0]:
+                cursor.execute(f"SELECT teacher_id FROM teachers WHERE username = '{user}'")
+                valid_login = True
+                student_session(record, user)  # launching student session
 
-            if valid_login == False:
-                os.system('cls')
-                print("Incorrect student login details...\n")
-
-        else:
+        if valid_login == False:
             os.system('cls')
-            print("Incorrect choice for student record, going back...\n")
-    except:
+            print("Incorrect student login details...\n")
+
+    else:
         os.system('cls')
-        print("No valid input, going back...\n")
+        print("Incorrect choice for student record, going back...\n")
 
 
 def teacher_session(teacher_id):
-    cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = {teacher_id}")
-    subjects = list(enumerate([x[0] for x in cursor.fetchall()], start=1))  # keeping a track of this particular teacher's
-
     os.system('cls')
     while True:
+        cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = {teacher_id}")
+        subjects = [x[0] for x in cursor.fetchall()]  # keeping a track of this particular teacher's
+        subjects.append("Go Back")
         cursor.execute(f"SELECT first_name FROM teachers WHERE teacher_id = '{teacher_id}'")
         first_name = cursor.fetchall()[0][0]
         print(f"Welcome to the teacher menu, {first_name}\n")
-        print("1. Review overall marks for a subject")
-        print("2. Update a test score")
-        print("3. Update a student's score")
-        print("4. List Pass/Failing students")
-        print("5. View students' performance")
-        print("6. Edit account info")
-        print("7. View subject details")
-        print("8. Change subject details")
-        print("9. Logout")
-        choice = input("Choice : ")
-        if choice == '1':  # review marks for a subjects
+
+        print("What to do?\n")
+        choice = questionary.select("Choices: ", choices=["Review overall marks for a subject",
+                                                          "Update a test score",
+                                                          "Update a student's score",
+                                                          "List Passing/Failing students",
+                                                          "View students' performance",
+                                                          "Edit account info",
+                                                          "View subject details",
+                                                          "Change subject details",
+                                                          "Logout"]).ask()
+
+        if choice == "Review overall marks for a subject":  # review marks for a subjects
             os.system('cls')
             print("Review overall marks for a subject\n")
-            [print(f"{x[0]}. {x[1]}") for x in subjects]
-            print(f"{len(subjects)+1}. Go back")
-            try:
-                choice = int(input("Subject : "))
-            except:
-                os.system('cls')
-                print("Invalid input, going back...\n")
+
+            print("Which subject?\n")
+            choice = questionary.select("Choices: ", choices=subjects).ask()
 
             # choosing for which subject to edit marks
-            if choice in [x[0] for x in subjects]:
+            if choice != "Go Back":
                 print("")
-                subject = subjects[choice-1][1]
+                subject = choice
                 cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
                 # choosing for which batch to edit marks for
-                records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
+                records = [str(x[0]) for x in cursor.fetchall()]
+                records.append("Go Back")
+
+                print("Which batch?\n")
+                record = questionary.select("Choices: ", choices=records).ask()
                 if len(records) < 1:
                     os.system('cls')
                     print("No student batch have reached this subject yet...\n")
                     continue
 
-                print("Choose student batch\n")
-                [print(f"{x[0]}. {x[1]}") for x in records]
-                print(f"{len(records)+1}. Go back")
-                try:
-                    choice = int(input("Which batch? : "))
-                except:
-                    os.system('cls')
-                    print("Invalid input for subject choice, going back...\n")
-
-                if int(choice) in [x[0] for x in records]:
-                    record = f"students_{records[int(choice)-1][1]}"
+                if record != "Go Back":
+                    record = f"students_{int(record)}"
                     table = f"{record}_{subject}".lower()
                     print('')
                     print(table)
@@ -542,65 +592,40 @@ def teacher_session(teacher_id):
                     print(f"{record}_{subject} values shown\n")
                     input("Press anything to continue...")
                     os.system('cls')
-                elif int(choice) == len(records)+1:
-                    os.system('cls')
-                    print("Going back...\n")
                 else:
                     os.system('cls')
-                    print("Incorrect student batch choice, going back...\n")
-                    continue
+                    print("Going back...\n")
             else:
                 os.system('cls')
                 print("Incorrect subject choice, going back...\n")
                 continue
 
-        elif choice == '2':  # updating scores of students for a test
+        elif choice == "Update a test score":  # updating scores of students for a test
             os.system('cls')
             print("Updating a test score\n")
-            [print(f"{x[0]}. {x[1]}") for x in subjects]
-            print(f"{len(subjects)+1}. Go back")
-            try:
-                choice = int(input("Subject : "))
-            except:
-                os.system('cls')
-                print("Invalid input, going back...\n")
-                continue
+            subject = questionary.select("Choices: ", choices=subjects).ask()
 
             # choosing for which subject to edit marks
-            if int(choice) in [x[0] for x in subjects]:
+            if subject != "Go Back":
                 print("")
-                subject = subjects[int(choice)-1][1]
                 cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
                 # choosing for which batch to edit marks for
-                records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
+                records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
                     os.system('cls')
                     print("No student batch has reached this subject yet....\n")
                     continue
 
-                print("Choose student batch\n")
-                [print(f"{x[0]}. {x[1]}") for x in records]
-                print(f"{len(records)+1}. Go back")
-                try:
-                    choice = int(input("Choice : "))
-                except:
-                    os.system('cls')
-                    print("Invalid input, going back...\n")
-                    continue
+                records.append("")
 
-                if int(choice) in [x[0] for x in records]:  # choosing student record
-                    record = f"students_{records[int(choice)-1][1]}"
+                print("Choose student batch\n")
+                record = questionary.select("Choices: ", choices=records).ask()
+
+                if record != "Go Back":  # choosing student record
+                    record = f"students_{record}"
                     cursor.execute(f"SELECT type FROM {subject}_details")
-                    types = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                    print(' ')
-                    [print(f"{x[0]}. {x[1]}") for x in types]
-                    try:
-                        choice = int(input("Which test type? : "))
-                        type = types[int(choice)-1][1]
-                    except:
-                        os.system('cls')
-                        print("Invalid input, going back...\n")
-                        continue
+                    print("Which test type?: ")
+                    type = questionary.select("Choices: ", choices=[x[0] for x in cursor.fetchall()]).ask()
 
                     print(' ')
                     cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")  # getting amount for that test type
@@ -609,15 +634,8 @@ def teacher_session(teacher_id):
                     if amount == 1:
                         test = type
                     else:
-                        tests = list(enumerate([f"{type}_{x}" for x in range(1, amount+1)], start=1))
-                        [print(f"{x[0]}. {x[1]}") for x in tests]
-                        try:
-                            choice = int(input("Which test? : "))
-                            test = f"{tests[choice-1][1]}"
-                        except:
-                            os.system('cls')
-                            print("Invalid input, going back...\n")
-                            continue
+                        print("Which test?\n")
+                        test = questionary.select("Choices: ", choices=[f"{type}_{x}" for x in range(1, amount+1)]).ask()
 
                     # loading subject prediction models
                     passfail = pickle.load(open(f"{path}/{subject}_passfail", 'rb'))
@@ -736,68 +754,39 @@ def teacher_session(teacher_id):
                 print("Going back...\n")
                 continue
 
-        elif choice == '3':  # updating grade of one student in a particular subject
+        elif choice == "Update a student's score":  # updating grade of one student in a particular subject
             os.system('cls')
             print("Update grade for a student\n")
-            [print(f"{x[0]}. {x[1]}") for x in subjects]
-            print(f"{len(subjects)+1}. Go back")
-            try:
-                choice = int(input("Subject : "))
-            except:
-                os.system('cls')
-                print("No valid input, going back...\n")
-                continue
+            subject = questionary.select("Choices: ", choices=subjects).ask()
 
             # choosing for which subject to edit marks
-            if choice in [x[0] for x in subjects]:
+            if subject != "Go Back":
                 print("")
-                subject = subjects[int(choice)-1][1]
                 cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
                 # choosing for which batch to edit marks for
-                records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                if len(records) < 1:
+                record = [str(x[0]) for x in cursor.fetchall()]
+                if len(record) < 1:
                     os.system('cls')
                     print("No student batch has reached this subject yet...\n")
                     continue
+                record.append("Go Back")
 
                 print("Choose student batch\n")
-                [print(f"{x[0]}. {x[1]}") for x in records]  # choosing student batch
-                print(f"{len(records)+1}. Go back")
-                try:
-                    choice = int(input("Choice : "))
-                except:
-                    os.system('cls')
-                    print("Invalid input given, going back...\n")
-                    continue
+                choice = questionary.select("Choice: ", choices=record).ask()
 
-                if int(choice) in [x[0] for x in records]:
-                    record = f"students_{records[int(choice)-1][1]}"
+                if choice != "Go Back":
+                    record = f"students_{choice}"
                     print("\nChoose student id to edit marks for : \n")
                     cursor.execute(f"SELECT student_id FROM {record}_{subject}")  # choosing student
-                    ids = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                    [print(f"{x[0]}. {x[1]}") for x in ids]
-                    print(f"{len(ids)+1}. Go back")
-                    try:
-                        choice = int(input("Choice : "))
-                    except:
-                        os.system('cls')
-                        print("Invalid input given, going back...\n")
-                        continue
+                    ids = [str(x[0]) for x in cursor.fetchall()]
+                    ids.append("Go Back")
 
-                    if int(choice) in [x[0] for x in ids]:
-                        student_id = ids[int(choice)-1][1]
+                    print("Choose student id\n")
+                    student_id = questionary.select("Choices: ", choices=ids).ask()
 
+                    if student_id != "Go Back":
                         cursor.execute(f"SELECT type FROM {subject}_details")
-                        types = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                        print(' ')
-                        [print(f"{x[0]}. {x[1]}") for x in types]
-                        try:
-                            choice = int(input("Which test type? : "))
-                            type = types[int(choice)-1][1]
-                        except:
-                            os.system('cls')
-                            print("Invalid input, going back...\n")
-                            continue
+                        type = questionary.select("Choices: ", choices=[x[0] for x in cursor.fetchall()]).ask()
 
                         print(' ')
                         cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")  # getting amount for that test type
@@ -806,15 +795,8 @@ def teacher_session(teacher_id):
                         if amount == 1:
                             test = type
                         else:
-                            tests = list(enumerate([f"{type}_{x}" for x in range(1, amount+1)], start=1))
-                            [print(f"{x[0]}. {x[1]}") for x in tests]
-                            try:
-                                choice = int(input("Which test? : "))
-                                test = f"{tests[choice-1][1]}"
-                            except:
-                                os.system('cls')
-                                print("Invalid input, going back...\n")
-                                continue
+                            print("Which test?\n")
+                            test = questionary.select("Choices: ", choices=[f"{type}_{x}" for x in range(1, amount+1)]).ask()
 
                         mark = input(f"\nEnter new mark for student_id {student_id} in {test} for {subject} : ")
                         cursor.execute(f"UPDATE {record}_{subject} SET {test} = {int(mark)} WHERE student_id = {student_id}")
@@ -912,49 +894,34 @@ def teacher_session(teacher_id):
                 os.system('cls')
                 print("Incorrect choice for subject selection, going back...\n")
 
-        elif choice == '4':  # list the students who are actually and predicted to passing/failing
+        elif choice == "List Passing/Failing students":  # list the students who are actually and predicted to passing/failing
             os.system('cls')
             print("Listing students who are actually and predicted to pass/fail\n")
             cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = '{teacher_id}'")
-            subjects = list(enumerate([x[0] for x in cursor.fetchall()], start=1))  # gathering subjects the teacher manages
-            [print(f"{x[0]}. {x[1]}") for x in subjects]
-            try:
-                choice = int(input("Which subject? : "))
-            except:
-                os.system('cls')
-                print("Invalid input for subjects, going back...\n")
-                continue
+            subjects = [x[0] for x in cursor.fetchall()]
+            subjects.append("Go Back")
 
-            if choice in [x[0] for x in subjects]:
-                subject = subjects[choice-1][1]
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
                 cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
-                records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
+                records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
                     os.system('cls')
                     print("There are no student batches who are in the semester (or after) this subject...\n")
                     continue
 
                 print(' ')
-                [print(f"{x[0]}. {x[1]}") for x in records]
-                try:
-                    choice = int(input("Which batch? : "))
-                    record = f"students_{records[choice-1][1]}"
-                except:
-                    os.system('cls')
-                    print("Invalid input for student batch choice, going back...\n")
-                    continue
+                print("Which batch?\n")
+                record = questionary.select("Choices: ", choices=records).ask()
+                record = f"students_{record}"
 
-                print("\n1. Predicted Grades")
-                print("2. Actual Grades")
-                try:
-                    choice = int(input("What type of grade? : "))
-                except:
-                    os.system('cls')
-                    print("Invalid choice for grades type choice, going back...\n")
-                    continue
+                while True:
+                    print("\nPredicted or Calculated grades?\n")
+                    choice = questionary.select("Choices: ", choices=["Prediction Grades", "Calculated Grades", "Go Back"]).ask()
 
-                if choice in [1, 2]:
-                    if choice == 1:  # prediction grades
+                    if choice == "Prediction Grades":  # prediction grades
                         os.system('cls')
                         print(f"Showing students in {records[0][1]} who are predicted to pass/fail {subject}\n")
                         print("Predicted to pass:")
@@ -970,7 +937,7 @@ def teacher_session(teacher_id):
                         print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
-                    else:  # actual grades (so far)
+                    elif choice == "Calculated Grades":  # actual grades (so far)
                         os.system('cls')
                         print(f"Showing students in {records[0][1]} and their actual grades (so far) in {subject}\n")
                         print("Going to pass:")
@@ -986,119 +953,99 @@ def teacher_session(teacher_id):
                         print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
+                    else:
+                        os.system('cls')
+                        print("Going back...\n")
+                        break
 
-                else:
-                    print("Invalid choice for grades type choice, going back...\n")
-                    continue
-
-        elif choice == '5':  # visually interpreting students' performance in a subject
+        elif choice == "View students' performance":  # visually interpreting students' performance in a subject
             os.system('cls')
             print("Visually interpreting students' performance for a subject\n")
-            cursor.execute(f"SELECT name FROM subjects WHERE teacher_id = '{teacher_id}'")
-            subjects = list(enumerate([x[0] for x in cursor.fetchall()], start=1))  # gathering subjects the teacher manages
-            [print(f"{x[0]}. {x[1]}") for x in subjects]
-            try:
-                choice = int(input("Which subject? : "))
-            except:
-                os.system('cls')
-                print("Invalid input for subject, going back...\n")
-                continue
+            cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = '{teacher_id}'")
+            subjects = [x[0] for x in cursor.fetchall()]
+            subjects.append("Go Back")
 
-            if choice in [x[0] for x in subjects]:
-                cursor.execute(f"SELECT id FROM subjects WHERE name = '{subjects[int(choice)-1][1]}'")
-                subject = cursor.fetchall()[0][0].lower()
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
                 cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
-                records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
+                records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
                     os.system('cls')
                     print("There are no student batches who are in the semester (or after) this subject...\n")
                     continue
 
-                print(' ')
-                [print(f"{x[0]}. {x[1]}") for x in records]
+                print("Which batch?\n")
+                record = questionary.select("Choices: ", choices=records).ask()
+                # getting the predicted and actual grades
+                df = pd.read_sql(f"SELECT * FROM students_{record}_{subject}",
+                                 db, index_col='student_id')[['PREDICTED_GRADE', 'GRADE']]
+
                 try:
-                    choice = int(input("Which batch? : "))
+                    # prediction grades
+                    pred_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x.split()[0]) for x in df['PREDICTED_GRADE']]])  # numerical grade
+                    pred_grade_l = np.array([x.split()[1][1] for x in df['PREDICTED_GRADE']])  # letter grade
+
+                    # actual grades (manually calculated)
+                    actual_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x.split()[0]) for x in df['GRADE']]])
+                    actual_grade_l = np.array([x.split()[1][1] for x in df['GRADE']])
                 except:
                     os.system('cls')
-                    print("Invalid input for student batch choice, going back...\n")
+                    print("No predicted grades available, going back...\n")
                     continue
 
-                if int(choice) in [x[0] for x in records]:
-                    print(f"\nShowing grades in {subject} for batch {records[int(choice)-1][1]}", '\n')
+                fig = plt.figure()
+                # predictions
+                fig.add_subplot(221)
+                plt.title("Predicted Pass/Fail", fontsize=12)
+                plt.pie([np.count_nonzero(pred_grade_p == 1), np.count_nonzero(pred_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
+                plt.legend(loc='best')
+                plt.tight_layout()
 
-                    # getting the predicted and actual grades
-                    df = pd.read_sql(f"SELECT * FROM students_{records[int(choice)-1][1]}_{subject}",
-                                     db, index_col='student_id')[['PREDICTED_GRADE', 'GRADE']]
+                fig.add_subplot(222)
+                plt.title("Predicted Letter Grades", fontsize=12)
+                plt.pie([np.count_nonzero(pred_grade_l == x) for x in np.unique(pred_grade_l)], labels=np.unique(pred_grade_l), autopct='%.2f%%')
+                plt.legend(loc='best')
+                plt.tight_layout()
 
-                    try:
+                # actual grades
+                fig.add_subplot(223)
+                plt.title("Actual Pass/Fail", fontsize=12)
+                plt.pie([np.count_nonzero(actual_grade_p == 1), np.count_nonzero(actual_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
+                plt.legend(loc='best')
+                plt.tight_layout()
 
-                        # prediction grades
-                        pred_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x[:5]) for x in df['PREDICTED_GRADE']]])  # numerical grade
-                        pred_grade_l = np.array([x[-2] for x in df['PREDICTED_GRADE']])  # letter grade
+                fig.add_subplot(224)
+                plt.title("Actual Letter Grades", fontsize=12)
+                plt.pie([np.count_nonzero(actual_grade_l == x) for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
+                plt.legend(loc='best')
+                plt.tight_layout()
+                plt.show()
 
-                        # actual grades (manually calculated)
-                        actual_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x[:5]) for x in df['GRADE']]])
-                        actual_grade_l = np.array([x[-2] for x in df['GRADE']])
-                    except:
-                        os.system('cls')
-                        print("No predicted grades available, going back...\n")
-                        continue
-
-                    fig = plt.figure()
-                    # predictions
-                    fig.add_subplot(221)
-                    plt.title("Predicted Pass/Fail", fontsize=12)
-                    plt.pie([np.count_nonzero(pred_grade_p == 1), np.count_nonzero(pred_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
-                    plt.legend(loc='best')
-                    plt.tight_layout()
-
-                    fig.add_subplot(222)
-                    plt.title("Predicted Letter Grades", fontsize=12)
-                    plt.pie([np.count_nonzero(pred_grade_l == x) for x in np.unique(pred_grade_l)], labels=np.unique(pred_grade_l), autopct='%.2f%%')
-                    plt.legend(loc='best')
-                    plt.tight_layout()
-
-                    # actual grades
-                    fig.add_subplot(223)
-                    plt.title("Actual Pass/Fail", fontsize=12)
-                    plt.pie([np.count_nonzero(actual_grade_p == 1), np.count_nonzero(actual_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
-                    plt.legend(loc='best')
-                    plt.tight_layout()
-
-                    fig.add_subplot(224)
-                    plt.title("Actual Letter Grades", fontsize=12)
-                    plt.pie([np.count_nonzero(actual_grade_l == x) for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
-                    plt.legend(loc='best')
-                    plt.tight_layout()
-                    plt.show()
-
-                    os.system('cls')
-                    print(f"Student's performance shown for {subject}\n")
-
-                else:
-                    os.system('cls')
-                    print("Incorrect batch choice, going back...\n")
+                os.system('cls')
+                print(f"Student's performance shown for {subject}\n")
 
             else:
                 os.system('cls')
                 print("Incorrect subject choice, going back...\n")
 
-        elif choice == '6':  # changing first_name, last_name or password of teacher account
+        elif choice == "Edit account info":  # changing first_name, last_name or password of teacher account
             os.system('cls')
             print("Changing teacher account details\n")
+            df = pd.read_sql(f"SELECT * FROM teachers WHERE teacher_id = {teacher_id}", db, index_col='teacher_id')
+            print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
             cursor.execute("DESCRIBE teachers")
-            details = list(enumerate([x[0] for x in cursor.fetchall() if x[0] not in ['teacher_id', 'username']], start=1))
-            [print(f"{x[0]}. {x[1]}") for x in details]
-            print(f"{len(details)+1}. Go back")
-            try:
-                choice = int(input("Choice : "))
-            except:
-                os.system('cls')
-                print("Invalid input for details, going back...\n")
-                continue
+            details = [x[0] for x in cursor.fetchall()]
 
-            if int(choice) in [x[0] for x in details]:
-                detail = details[int(choice)-1][1]
+            for x in ['teacher_id', 'email']:  # remove details of account that cannot be changed
+                details.remove(x)
+
+            details.append("Go Back")
+            print("Which detail to change?")
+            detail = questionary.select("Choose: ", choices=details).ask()
+
+            if detail != "Go Back":
                 print(f"\nChanging {detail}\n")
                 new_detail = input(f"Enter new {detail} : ")
                 cursor.execute(f"UPDATE teachers SET {detail} = '{new_detail}' WHERE teacher_id = {teacher_id}")
@@ -1111,57 +1058,33 @@ def teacher_session(teacher_id):
                 print("Incorrect choice for account detail to change, going back...\n")
                 continue
 
-        elif choice == '7':  # viewing subject details that the teacher teaches
+        elif choice == "View subject details":  # viewing subject details that the teacher teaches
             os.system('cls')
             print("Viewing subject details\n")
-            cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = {teacher_id}")
-            subjects = cursor.fetchall()
-            if len(subjects) < 1:
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
+                table = f"{subject}_details"
+                print(tabulate(pd.read_sql(f"SELECT * FROM {table}", db, index_col="Type"), headers='keys', tablefmt='psql'))
+                print(f"Details for {subject} shown\n")
+                input("\nEnter anything to continue...")
                 os.system('cls')
-                print("There are no subjects assigned to you\n")
             else:
-                subjects = list(enumerate(subjects[0], start=1))
-                [print(f"{x[0]}. {x[1]}") for x in subjects]
-                try:
-                    choice = int(input("Choice : "))
-                except:
-                    os.system('cls')
-                    print("Invalid choice for subjects, going back...\n")
-                    continue
+                os.system('cls')
+                print("Invalid option for subject choice, going back\n")
 
-                if int(choice) in [x[0] for x in subjects]:
-                    subject = f"{subjects[int(choice)-1][1].lower()}_details"
-                    print(tabulate(pd.read_sql(f"SELECT * FROM {subject}", db, index_col="Type"), headers='keys', tablefmt='psql'))
-                    print(f"Details for {subjects[int(choice)-1][1]} shown\n")
-                    input("\nEnter anything to continue...")
-                    os.system('cls')
-                else:
-                    os.system('cls')
-                    print("Invalid option for subject choice, going back\n")
-
-        elif choice == '8':  # changing subject details
+        elif choice == "Change subject details":  # changing subject details
             os.system('cls')
             print("Changing subject details\n")
-            cursor.execute(f"SELECT id FROM subjects WHERE teacher_id='{teacher_id}'")  # getting subjects the teacher manages
-            subjects = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-            try:
-                [print(f"{x[0]}. {x[1]}") for x in subjects]
-                choice = int(input("Which subject? : "))
-                subject = subjects[choice-1][1]
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
 
-            except:
-                os.system('cls')
-                print("Invalid input for subject choice, going back...\n")
-                continue
-
-            print(f"\nAre you sure you want to modify {subject}?")
-            print("1. Yes")
-            print("2. No")
-
-            if input("Choice : ") != '1':
-                os.system('cls')
-                print("Going back...\n")
-                continue
+            if subject != "Go Back":
+                print(f"Are you sure you want to modify {subject}?\n")
+                _ = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
+                if _ == "No":
+                    os.system('cls')
+                    continue
 
             # getting new subject details
             table_name = f"{subject}_details"
@@ -1305,14 +1228,10 @@ def teacher_session(teacher_id):
                     os.system('cls')
                     print(f"Details for {marksheet} added\n")
 
-        elif choice == '9':  # logging out of teacher session
+        elif choice == "Logout":  # logging out of teacher session
             os.system('cls')
             print("Logging out of teachers session...\n")
             break
-
-        else:
-            os.system('cls')
-            print("No valid option entered...\n")
 
 
 def teacher_auth():
@@ -1338,15 +1257,17 @@ def teacher_auth():
 def admin_session():
     while True:
         print("Welcome to the admin menu\n")
-        print("1. Set up main tables (students_{year} , teachers and subjects)")
-        print("2. Show tables")
-        print("3. Manage subjects")
-        print("4. Manage teacher accounts")
-        print("5. Manage student account")
-        print("6. Logout")
-        choice = input("Choice : ")
 
-        if choice == '1':  # automatically setting up the main 3 prerequisite tables required for further operations in course
+        print("What to do?\n")
+        choice = questionary.select("Choices: ", choices=["Set up main tables (students_{year}, teachers and subjects)",
+                                                          "Show tables",
+                                                          "Manage subjects",
+                                                          "Manage teacher accounts",
+                                                          "Manage student accounts",
+                                                          "Logout"]).ask()
+
+        # automatically setting up the main 3 prerequisite tables required for further operations in course
+        if choice == "Set up main tables (students_{year}, teachers and subjects)":
             os.system('cls')
             print("Setting up prerequisite tables\n")
             cursor.execute("SHOW TABLES LIKE 'subjects'")
@@ -1374,66 +1295,57 @@ def admin_session():
 
             else:
                 print("Main tables seem to already have been created\n")
+                input("Press anything to continue...")
+                os.system('cls')
+                continue
 
-        elif choice == '2':  # showing all table names and details about them
+        elif choice == 'Show tables':  # showing all table names and details about them
             os.system('cls')
-            print("Showing details in table\n")
-            cursor.execute("SHOW TABLES")
-            tables = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-            print('')
             while True:
-                print("Which table to show?\n")
-                [print(f"{x[0]}. {x[1]}") for x in tables]
-                print(f"{len(tables)+1}. Go back")
-                try:
-                    choice = int(input("Option : "))
-                except:
+                print("Showing and describing details in a table\n")
+                cursor.execute("SHOW TABLES")
+                tables = [x[0] for x in cursor.fetchall()]
+                tables.append("Go Back")
+
+                print("Which table?\n")
+                choice = questionary.select("Choices: ", choices=tables).ask()
+                if choice == 'Go Back':
                     os.system('cls')
-                    print("Invalid input given, going back...\n")
-                    continue
-
-                if int(choice) in range(1, len(tables)+1):
-                    table = tables[int(choice)-1][1]
-                    print('\n')
-                    print("Describing the table\n")
-                    print(tabulate(pd.read_sql(f"DESCRIBE {table}", db, index_col="Field"), headers='keys', tablefmt='psql'), '\n')
-
-                    print("Details within the table\n")
-                    df = pd.read_sql(f"SELECT * FROM {table}", db)
-                    df = df.set_index(df.columns[0])
-                    print(tabulate(df, headers='keys', tablefmt='psql', ), '\n')
-                    print(f"\n{table} details shown\n")
-
-                elif int(choice) == len(tables)+1:
-                    os.system('cls')
-                    print("Going back from showing table details...\n")
                     break
 
                 else:
-                    os.system('cls')
-                    print("Enter valid choice for table to show details for...\n")
+                    print("\nDescribing the table\n")
+                    print(tabulate(pd.read_sql(f"DESC {choice}", db, index_col='Field'), headers='keys', tablefmt='psql'), '\n')
 
-        elif choice == '3':  # adding or deleting a subject
+                    print("Details within the table\n")
+                    df = pd.read_sql(f"SELECT * FROM {choice}", db)
+                    df = df.set_index(df.columns[0])
+                    print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+
+                    input("Press anything to continue...")
+                    os.system('cls')
+                    print(f"{choice} details shown\n")
+
+        elif choice == 'Manage subjects':  # adding or deleting a subject
             os.system('cls')
             while True:
-                print("Managing subjects")
-                print("\n1. Add a subject")
-                print("2. Delete a subject")
-                print("3. Go back")
-                choice = input("Choice : ")
-                if choice == '1':
+                print("Managing subjects\n")
+
+                print("What to do?\n")
+                choice = questionary.select("Choices: ", choices=["Add a subject",
+                                                                  "Delete a subject",
+                                                                  "Go Back"]).ask()
+                if choice == 'Add a subject':
                     print("\nAdding a subject\n")
                     teachers = pd.read_sql("SELECT * FROM teachers", db, index_col='teacher_id')
                     if len(teachers) < 1:
                         print("There are no teachers registered in the records yet\n")
                         continue
-                    else:
-                        print("IS THE TEACHER THAT TEACHES THIS SUBJECT IN THE TABLE?\n")
-                        print(tabulate(teachers, headers='keys', tablefmt='psql'), '\n')
-                    print("1. YES")
-                    print("2. NO")
-                    choice = input("Choice : ")
-                    if choice == '1':
+
+                    print("IS THE TEACHER THAT TEACHES THIS SUBJECT IN THE TABLE?\n")
+                    print(tabulate(teachers, headers='keys', tablefmt='psql'), '\n')
+                    choice = questionary.select("Choices: ", choices=['Yes', 'No']).ask()
+                    if choice == "Yes":
                         print(' ')
                         cursor.execute("SELECT id FROM subjects")
                         subject_names = [x[0] for x in cursor.fetchall()]
@@ -1603,28 +1515,26 @@ def admin_session():
                         os.system('cls')
                         print("Make sure to enter the teacher details in the teacher table first...\n")
 
-                elif choice == '2':  # deleting a subject
+                elif choice == 'Delete a subject':  # deleting a subject
                     os.system('cls')
                     print("Deleting a subject\n")
                     cursor.execute("SELECT id FROM subjects")
-                    names = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                    [print(f"{x[0]}. {x[1]}") for x in names]
-                    print(f"{len(names)+1}. Go back")
-                    try:
-                        choice = int(input("Choice : "))
-                    except:
-                        os.system('cls')
-                        print("Invalid input given, going back...\n")
-                        continue
+                    subjects = [x[0] for x in cursor.fetchall()]
+                    subjects.append("Go Back")
 
-                    if int(choice) in range(1, len(names)+1):
-                        subject = names[int(choice)-1][1]
-                        print(f"Deleting {subject}\n")
-                        print("Are you sure?")
-                        print("1. YES")
-                        print("2. NO")
-                        choice = input("Choice : ")
-                        if choice == '1':
+                    print("Which subject to delete?\n")
+                    choice = questionary.select("Choices: ", choices=subjects).ask()
+
+                    if choice == "Go Back":
+                        os.system('cls')
+                        print("Going back...\n")
+                        continue
+                    else:
+                        subject = choice
+                        print(f"\nAre you sure you want to delete {subject}?\n")
+                        choice = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
+
+                        if choice == "Yes":
                             cursor.execute(f"DELETE FROM subjects WHERE id = '{subject}'")
                             db.commit()
 
@@ -1660,24 +1570,22 @@ def admin_session():
                             print("Going back...\n")
                             break
 
-                elif choice == '3':
+                elif choice == "Go Back":
                     os.system('cls')
                     print("Going back...\n")
                     break
 
-                else:
-                    os.system('cls')
-                    print("Invalid choice, enter again...\n")
-
-        elif choice == '4':  # managing teacher accounts
+        elif choice == 'Manage teacher accounts':  # managing teacher accounts
             os.system('cls')
             while True:
-                print("Managing teacher accounts")
-                print("\n1. Add a teacher account")
-                print("2. Delete a teacher account")
-                print("3. Go back")
-                choice = input("Choice : ")
-                if choice == '1':  # adding a teacher account
+                print("Managing teacher accounts\n")
+
+                print("What to do?\n")
+                choice = questionary.select("Choices: ", choices=["Add a teacher account",
+                                                                  "Delete a teacher account",
+                                                                  "Go Back"]).ask()
+
+                if choice == "Add a teacher account":  # adding a teacher account
                     os.system('cls')
                     print("Adding a teacher\n")
                     first = input("First name : ")
@@ -1691,58 +1599,44 @@ def admin_session():
                     os.system('cls')
                     print(f"{user} has been added as a teacher\n")
 
-                elif choice == '2':  # deleting a teacher account
+                elif choice == "Delete a teacher account":  # deleting a teacher account
                     os.system('cls')
                     print("Deleting a teacher\n")
+                    print(tabulate(pd.read_sql("SELECT * FROM teachers", db, index_col='teacher_id'), headers='keys', tablefmt='psql'), '\n')
                     cursor.execute("SELECT teacher_id FROM teachers")
-                    ids = [x[0] for x in cursor.fetchall()]
-                    print(tabulate(pd.read_sql("SELECT * FROM teachers", db, index_col='teacher_id'), headers='keys', tablefmt='psql'))
-                    try:
-                        choice = int(input("Input id of teacher to delete : "))
-                    except:
-                        os.system('cls')
-                        print("Invalid input given, going back...\n")
-                        continue
+                    print("Choose id of teacher to delete\n")
+                    id = int(questionary.select("Choices: ", choices=[str(x[0]) for x in cursor.fetchall()]).ask())
 
-                    if int(choice) in ids:
-                        print("Are you sure?")
-                        print("1. Yes")
-                        print("2. No")
-                        choice = input("Choice : ")
-                        if choice == '1':
-                            cursor.execute(f"SELECT username FROM teachers WHERE teacher_id = {choice}")
-                            user = cursor.fetchall()[0][0]
-                            cursor.execute(f"DELETE FROM teachers WHERE teacher_id = {choice}")
-                            db.commit
-                            os.system('cls')
-                            print(f"{user} has been deleted from teacher records\n")
-                        elif choice == '2':
-                            print("Going back...\n")
-                            os.system('cls')
-                            continue
+                    print("Are you sure?\n")
+                    choice = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
+                    if choice == "Yes":
+                        cursor.execute(f"SELECT username FROM teachers WHERE teacher_id = '{id}'")
+                        user = cursor.fetchall()[0][0]
+                        cursor.execute(f"DELETE FROM teachers WHERE teacher_id = '{id}'")
+                        db.commit()
+                        os.system('cls')
+                        print(f"{user} has been deleted from teacher records\n")
                     else:
                         os.system('cls')
                         print("Invalid choice, going back...\n")
 
-                elif choice == '3':
+                elif choice == "Go Back":
                     os.system('cls')
                     print("Going back...\n")
                     break
 
-                else:
-                    os.system('cls')
-                    print("Incorrect choice, enter a valid choice...\n")
-
-        elif choice == '5':  # managing student account/records
+        elif choice == 'Manage student accounts':  # managing student account/records
             os.system('cls')
             while True:
-                print("Managing student accounts/records")
-                print("\n1. Create new student records for new batch")
-                print("2. Add a student account")
-                print("3. Delete a student account")
-                print("4. Go back")
-                choice = input("Choice : ")
-                if choice == '1':  # creating a new student records table for new batch and grade sheets
+                print("Managing student accounts/records\n")
+
+                print("What to do?\n")
+                choice = questionary.select("Choices: ", choices=["Create new student records for new batch",
+                                                                  "Add a student account",
+                                                                  "Delete a student account",
+                                                                  "Go Back"]).ask()
+
+                if choice == "Create new student records for new batch":  # creating a new student records table for new batch and grade sheets
                     os.system('cls')
                     print("Creating new student record\n")
                     while True:  # to get valid year input from user
@@ -1852,25 +1746,21 @@ def admin_session():
                         os.system('cls')
                         print(f"Student record for {year} already exists...\n")
 
-                elif choice == '2':  # adding students to a record
+                elif choice == "Add a student account":  # adding students to a record
                     os.system('cls')
                     print("Adding a student to a record\n")
                     cursor.execute("SELECT start_year FROM students_batch")
-                    student_records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                    [print(f"{x[0]}. {x[1]}") for x in student_records]
-                    print(f"{len(student_records)+1}. Go back")
-                    try:
-                        choice = int(input("Year : "))
-                    except:
-                        os.system('cls')
-                        print("Invalid input given, going back...\n")
-                        continue
+                    choices = [str(x[0]) for x in cursor.fetchall()]
+                    choices.append("Go Back")
 
-                    if int(choice) in range(1, len(student_records)+1):
-                        student_record = f"students_{student_records[int(choice)-1][1]}"
+                    print("Which batch?\n")
+                    choice = questionary.select("Choice: ", choices=choices).ask()
+
+                    if choice != "Go Back":
+                        student_record = f"students_{int(choice)}"
                         cursor.execute(f"SELECT username FROM {student_record}")
                         existing_users = [x[0] for x in cursor.fetchall()]
-                        year = student_record[len(student_record)-4:]
+                        year = int(choice)
                         while True:
                             user = input("\nEnter username for new student : ")
                             if user not in existing_users:
@@ -1917,25 +1807,21 @@ def admin_session():
                                 print(f"{user} already exists, try again\n")
                     else:
                         os.system('cls')
-                        print('Invalid choice, going back...\n')
+                        print("Going back...\n")
                         continue
 
-                elif choice == '3':  # deleting a student from a record
+                elif choice == "Delete a student account":  # deleting a student from a record
                     os.system('cls')
                     print("Deleting a student from a record\n")
                     cursor.execute("SELECT start_year FROM students_batch")
-                    student_records = list(enumerate([x[0] for x in cursor.fetchall()], start=1))
-                    [print(f"{x[0]}. {x[1]}") for x in student_records]
-                    print(f"{len(student_records)+1}. Go back")
-                    try:
-                        choice = int(input("Which batch? : "))
-                    except:
-                        os.system('cls')
-                        print("Invalid input given, going back...\n")
-                        continue
+                    choices = [str(x[0]) for x in cursor.fetchall()]
+                    choices.append("Go Back")
 
-                    if int(choice) in range(1, len(student_records)+1):
-                        year = student_records[int(choice)-1][1]
+                    print("Which batch?\n")
+                    choice = questionary.select("Choices: ", choices=choices).ask()
+
+                    if choice != "Go Back":
+                        year = int(choice)
                         student_record = f"students_{year}"
                         user = input("Input username of student to delete : ")
 
@@ -1945,11 +1831,9 @@ def admin_session():
                             print(f"Invalid user: {user}, going back...\n")
                             continue
 
-                        print(f"\nAre you sure to delete {user}?")
-                        print("1. YES")
-                        print("2. NO")
-                        choice = input("Choice : ")
-                        if choice == '1':
+                        print(f"\nAre you sure to delete {user}?\n")
+                        choice = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
+                        if choice == "Yes":
                             cursor.execute(f"DROP TRIGGER IF EXISTS semester_count_{year}")
 
                             cursor.execute(f"DELETE FROM {student_record} WHERE username = '{user}'")
@@ -1959,10 +1843,10 @@ def admin_session():
                                 f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {year})")
 
                             cursor.execute(
-                                f"SELECT students + lat_students FROM students_batch WHERE start_year = {int(student_records[int(choice)-1][1])}")
+                                f"SELECT students + lat_students FROM students_batch WHERE start_year = {year}")
                             tot_students = cursor.fetchall()[0][0]
                             cursor.execute(
-                                f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(student_records[int(choice)-1][1])}")
+                                f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {year}")
                             db.commit()
 
                             os.system('cls')
@@ -1973,26 +1857,18 @@ def admin_session():
                             continue
                     else:
                         os.system('cls')
-                        print("Invalid choice, going back...\n")
+                        print("Going back...\n")
                         continue
 
-                elif choice == '4':
+                elif choice == "Go Back":
                     os.system('cls')
                     print("Going back...\n")
                     break
 
-                else:
-                    os.system('cls')
-                    print("Enter a valid option...\n")
-
-        elif choice == '6':
+        elif choice == 'Logout':
             os.system('cls')
             print("Logging out...\n")
             break
-
-        else:
-            os.system('cls')
-            print("Incorrect choice, enter valid choice...\n")
 
 
 def admin_auth():
@@ -2007,24 +1883,36 @@ def admin_auth():
 
 def main():
     while True:
-        choices = questionary.select(f"{course} Login Page", choices=["Admin Login", "Teacher Login", "Student Login", "Exit"]).ask()
+        choice = questionary.select(f"{course} Login Page", choices=["Admin Login",
+                                                                     "Teacher Login",
+                                                                     "Student Login",
+                                                                     "Exit"]).ask()
 
-        if choices == 'Admin Login':
+        if choice == 'Admin Login':
             os.system('cls')
             admin_auth()
 
-        elif choices == 'Teacher Login':
+        elif choice == 'Teacher Login':
             os.system('cls')
             teacher_auth()
 
-        elif choices == 'Student Login':
+        elif choice == 'Student Login':
             os.system('cls')
             student_auth()
 
         else:
-            print("Bye!\n")
+            print("Bye!")
             break
 
 
 # war begins, ionia calls. hasagi
-main()
+if __name__ == "__main__":
+    """ MAKE SURE THE DATABASE DETAILS, SQL DETAILS AND PATH DETAILS ARE CORRECT FOR YOU """
+    course = "B.Tech CSE"  # name of course
+    database = 'btechcse'  # name of database
+    course_len = 4  # how many years is the course
+    path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"  # path to database and to store prediction models
+    db = mysql.connect(host='localhost', user='Ashwin', password='3431', database='btechcse')  # initializing connection to database
+    cursor = db.cursor(buffered=True)  # cursor
+
+    main()
