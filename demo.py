@@ -41,13 +41,7 @@ warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
         "- THE 3 MAIN PREQUISITE TABLES, AS SHOWN IN THE FIRST OPTION IN THE ADMIN MENU (IT IS AUTOMATICALLY DONE AS SOON AS THE OPTION IS SELECTED TO RUN), ARE A MUST HAVE REQUIREMENT BEFORE CONDUCTING ANY TYPE OF OPERATIONS"
 """
 
-""" MAKE SURE THE DATABASE DETAILS ARE CORRECT FOR YOU """
-course = "B.Tech CSE"  # name of course
-database = 'btechcse'  # name of database
-course_len = 4  # how many years is the course
-path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"  # path to database and to store prediction models
-db = mysql.connect(host='localhost', user='Ashwin', password='3431', database=database)  # initializing connection to database
-cursor = db.cursor(buffered=True)  # cursor
+""" MAKE SURE THE DATABASE DETAILS, SQL DETAILS AND PATH DETAILS ARE CORRECT FOR YOU NEAR THE END"""
 
 
 def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test_name, n=1000, graphs=False):  # grades generator
@@ -179,7 +173,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     dummy = [0] * len(marks[0])  # making dummy list to cummulatively add each test score
     pass_probabs = []  # to store each probability as each test score gets entered
     for x in range(len(marks[0])):
-        dummy[x] = marks[0][x]
+        dummy[x] = marks[0][x]  # blink
         pass_probabs.append(passfail.predict_proba(np.array([dummy]))[0][1] * 100)
 
     # interpolating results to give a smoother graph
@@ -193,7 +187,6 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     pf = None  # predicting if in the end the model predicts student failing or passing
     if passfail.predict(marks) == 0:
         pf = 'Fail'
-        # blink
     else:
         pf = 'Pass'
 
@@ -331,7 +324,11 @@ def student_session(record, user):
     while True:
         cursor.execute(f"SELECT first_name FROM {record} WHERE username = '{user}'")
         print(f"Welcome to the student menu, {cursor.fetchall()[0][0]}\n")
+
+        print("What to do?\n")
         choice = questionary.select("Choices: ", choices=["View grades",
+                                                          "Show predictions with custom grades",
+                                                          "View all subjects grades/details (including deleted ones)",
                                                           "View account details",
                                                           "Change account details",
                                                           "Logout"]).ask()
@@ -372,6 +369,8 @@ def student_session(record, user):
                     print(f"{test} -> {cursor.fetchall()[0][0]}")
 
                 marks = []  # storing marks of student
+
+                print("What to do?\n")
                 choice = questionary.select("Choices: ", choices=["View more info",
                                                                   "Go Back"]).ask()
 
@@ -389,8 +388,129 @@ def student_session(record, user):
                     print(f"Marks displayed for {user} in {subject}\n")
             else:
                 os.system('cls')
-                print("Incorrect choice for subjects\n")
+                print("Going back...\n")
                 continue
+
+        elif choice == "Show predictions with custom grades":  # taking custom grades for a subject and showing predictions based on them
+            os.system('cls')
+            print("Show predictions with custom grades\n")
+
+            # getting semester choice to display subjects in said semester
+            cursor.execute(f"SELECT cur_semester FROM {record} WHERE username = '{user}'")
+            semesters = [str(x) for x in range(1, int(cursor.fetchall()[0][0])+1)]
+            semesters.append("Go Back")
+
+            print("Which semester?\n")
+            semester = questionary.select("Choices: ", choices=semesters).ask()
+            print(' ')
+
+            if semester == "Go Back":
+                os.system('cls')
+                print("Going back from viewing custom grades...\n")
+                continue
+
+            # getting subjects that are in the specified semester
+            cursor.execute(f"SELECT id, name FROM subjects WHERE semester = '{semester}'")
+            subjects = [x[0] for x in cursor.fetchall()]
+            subjects.append("Go Back")
+
+            print("Which subject?\n")
+            subject = questionary.select("Choices: ", choices=subjects).ask()
+
+            if subject != "Go Back":
+                custom_marks = []  # storing custom marks entered by the student for a subject
+
+                # getting the test types, amount and max_marks for subject
+                cursor.execute(f"SELECT type, amount, max_mark FROM {subject}_details")
+                subj_details = [x for x in cursor.fetchall()]
+                for subj_detail in subj_details:
+                    type, amount, max_mark = subj_detail  # unpacking tuple values
+                    if amount < 2:  # if it is a test type with one evaluation
+                        while True:
+                            # making sure the user inputs are valid
+                            try:
+                                mark = int(input(f"Enter mark for {type} (Max: {max_mark}) -> "))
+                                if mark <= max_mark:
+                                    custom_marks.append(mark)
+                                    break
+                                else:
+                                    print(f"Mark must be below {max_mark} for {type}!\n")
+                            except:
+                                print("Enter valid input...\n")
+                    else:  # if it is a test type with multiple evaluations
+                        for x in range(1, amount+1):
+                            while True:
+                                try:
+                                    mark = int(input(f"Enter mark for {type} {x} (Max: {max_mark}) -> "))
+                                    if mark <= max_mark:
+                                        custom_marks.append(mark)
+                                        break
+                                    else:
+                                        print(f"Mark must be below {max_mark} for {type}\n")
+                                except:
+                                    print("Enter valid input...\n")
+
+                # getting predictions and producing graphs with the custom marks
+                rolling_predict(custom_marks, subject, record)
+                os.system('cls')
+                print(f"Custom marks displayed for {user} in {subject}\n")
+
+            else:
+                os.system('cls')
+                print("Going back...\n")
+                continue
+
+        elif choice == "View all subjects grades/details (including deleted ones)":  # showing marsheets for subjects that may have been deleted
+            os.system('cls')
+            while True:
+                print("Showing all subjects for student's batch\n")
+                cursor.execute(f"SHOW TABLES LIKE '{record}_%'")
+
+                # getting subjects from the names of all the marksheets for the student's batch
+                subjects = [str(x[0][len(record)+1:]).upper() for x in cursor.fetchall()]
+                subjects.append("Go Back")
+
+                print("View grades or subject details?\n")
+                choice = questionary.select("Choices : ", choices=["View grades", "View subject details", "Go Back"]).ask()
+                if choice == "View grades":
+                    # getting subject choice
+                    print("Which subject to view grade for?")
+                    subject = questionary.select("Choice : ", subjects).ask()
+                    if subject == "Go Back":
+                        os.system('cls')
+                        print("Going back...\n")
+                        continue
+                    else:
+                        # getting column names
+                        cursor.execute(f"DESC {record}_{subject}")
+                        cols = [x[0] for x in cursor.fetchall()]
+
+                        # getting data from marksheet for student
+                        cursor.execute(f"SELECT * FROM {record}_{subject} WHERE student_id = (SELECT id FROM {record} WHERE username = '{user}')")
+                        marks = cursor.fetchall()[0]
+
+                        print(f"Showing your marks for {subject}\n")
+                        [print(f"{cols[x]} -> {marks[x]}") for x in range(len(cols))]
+                        input("Press anything to continue...\n")
+                        os.system('cls')
+
+                elif choice == "View subject details":  # viewing subject details taken by the student
+                    print("Which subject to view details for?")
+                    subject = questionary.select("Choice : ", subjects).ask()
+
+                    if subject == "Go Back":
+                        os.system('cls')
+                        print("Going back...\n")
+                        continue
+                    else:
+                        print(tabulate(pd.read_sql(f"SELECT * FROM {subject}_details", db, index_col='Type'), headers='keys', tablefmt='psql'))
+                        print(f"\nDetails shown for {subject}\n")
+                        input("Press anything to continue...\n")
+                        os.system('cls')
+
+                else:
+                    os.system('cls')
+                    break
 
         elif choice == "View account details":  # showing student account details
             os.system('cls')
@@ -416,11 +536,20 @@ def student_session(record, user):
             col = questionary.select("Choices: ", choices=cols).ask()
 
             if col != "Go Back":
-                cursor.execute(f"SELECT {col} FROM {record} WHERE username = '{user}'")
-                old_detail = cursor.fetchall()[0][0]
-                new_detail = input(f"\nOld {col} -> {old_detail}\nEnter new {col} : ")
-                cursor.execute(f"UPDATE {record} SET {col} = '{new_detail}' WHERE username = '{user}'")
-                db.commit()
+                while True:
+                    try:
+                        cursor.execute(f"SELECT {col} FROM {record} WHERE username = '{user}'")
+                        old_detail = cursor.fetchall()[0][0]
+                        new_detail = input(f"\nOld {col} -> {old_detail}\nEnter new {col} : ")
+                        cursor.execute(f"UPDATE {record} SET {col} = '{new_detail}' WHERE username = '{user}'")
+                        db.commit()
+                        break
+                    except:
+                        print("Enter valid input...\n")
+
+                # updating user variable incase student decides to update it
+                cursor.execute(f"SELECT username FROM {record} WHERE {col} = '{new_detail}'")
+                user = cursor.fetchall()[0][0]
 
                 os.system('cls')
                 print(f"Account detail {col} changed from {old_detail} to {new_detail}\n")
@@ -453,7 +582,7 @@ def student_auth():
         if user in [x[0] for x in cursor.fetchall()]:
             cursor.execute(f"SELECT password FROM {record} WHERE username = '{user}'")
             if passw == cursor.fetchall()[0][0]:
-                cursor.execute(f"SELECT teacher_id FROM teachers WHERE username = '{user}'")
+
                 valid_login = True
                 student_session(record, user)  # launching student session
 
@@ -475,6 +604,8 @@ def teacher_session(teacher_id):
         cursor.execute(f"SELECT first_name FROM teachers WHERE teacher_id = '{teacher_id}'")
         first_name = cursor.fetchall()[0][0]
         print(f"Welcome to the teacher menu, {first_name}\n")
+
+        print("What to do?\n")
         choice = questionary.select("Choices: ", choices=["Review overall marks for a subject",
                                                           "Update a test score",
                                                           "Update a student's score",
@@ -488,6 +619,8 @@ def teacher_session(teacher_id):
         if choice == "Review overall marks for a subject":  # review marks for a subjects
             os.system('cls')
             print("Review overall marks for a subject\n")
+
+            print("Which subject?\n")
             choice = questionary.select("Choices: ", choices=subjects).ask()
 
             # choosing for which subject to edit marks
@@ -498,6 +631,8 @@ def teacher_session(teacher_id):
                 # choosing for which batch to edit marks for
                 records = [str(x[0]) for x in cursor.fetchall()]
                 records.append("Go Back")
+
+                print("Which batch?\n")
                 record = questionary.select("Choices: ", choices=records).ask()
                 if len(records) < 1:
                     os.system('cls')
@@ -555,6 +690,7 @@ def teacher_session(teacher_id):
                     if amount == 1:
                         test = type
                     else:
+                        print("Which test?\n")
                         test = questionary.select("Choices: ", choices=[f"{type}_{x}" for x in range(1, amount+1)]).ask()
 
                     # loading subject prediction models
@@ -715,6 +851,7 @@ def teacher_session(teacher_id):
                         if amount == 1:
                             test = type
                         else:
+                            print("Which test?\n")
                             test = questionary.select("Choices: ", choices=[f"{type}_{x}" for x in range(1, amount+1)]).ask()
 
                         mark = input(f"\nEnter new mark for student_id {student_id} in {test} for {subject} : ")
@@ -820,6 +957,7 @@ def teacher_session(teacher_id):
             subjects = [x[0] for x in cursor.fetchall()]
             subjects.append("Go Back")
 
+            print("Which subject?\n")
             subject = questionary.select("Choices: ", choices=subjects).ask()
 
             if subject != "Go Back":
@@ -831,10 +969,12 @@ def teacher_session(teacher_id):
                     continue
 
                 print(' ')
+                print("Which batch?\n")
                 record = questionary.select("Choices: ", choices=records).ask()
                 record = f"students_{record}"
 
                 while True:
+                    print("\nPredicted or Calculated grades?\n")
                     choice = questionary.select("Choices: ", choices=["Prediction Grades", "Calculated Grades", "Go Back"]).ask()
 
                     if choice == "Prediction Grades":  # prediction grades
@@ -881,6 +1021,7 @@ def teacher_session(teacher_id):
             subjects = [x[0] for x in cursor.fetchall()]
             subjects.append("Go Back")
 
+            print("Which subject?\n")
             subject = questionary.select("Choices: ", choices=subjects).ask()
 
             if subject != "Go Back":
@@ -991,6 +1132,7 @@ def teacher_session(teacher_id):
         elif choice == "Change subject details":  # changing subject details
             os.system('cls')
             print("Changing subject details\n")
+            print("Which subject?\n")
             subject = questionary.select("Choices: ", choices=subjects).ask()
 
             if subject != "Go Back":
@@ -1168,50 +1310,21 @@ def teacher_auth():
         print("Incorrect teacher login details...\n")
 
 
-def admin_session():
+def admin_session(user):
     while True:
-        print("Welcome to the admin menu\n")
-        choice = questionary.select("Choices: ", choices=["Set up main tables (students_{year}, teachers and subjects)",
-                                                          "Show tables",
+        print(f"Welcome to the admin menu, {user}\n")
+
+        print("What to do?\n")
+        choice = questionary.select("Choices: ", choices=["Show tables",
                                                           "Manage subjects",
+                                                          "Manage courses",
                                                           "Manage teacher accounts",
                                                           "Manage student accounts",
+                                                          "Manage my account details",
+                                                          "Add admin account",
                                                           "Logout"]).ask()
 
-        # automatically setting up the main 3 prerequisite tables required for further operations in course
-        if choice == "Set up main tables (students_{year}, teachers and subjects)":
-            os.system('cls')
-            print("Setting up prerequisite tables\n")
-            cursor.execute("SHOW TABLES LIKE 'subjects'")
-            if len(cursor.fetchall()) < 1:
-                print("\nCreating teacher table")
-                cursor.execute(
-                    "CREATE TABLE IF NOT EXISTS teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT, first_name VARCHAR(30) NOT NULL, last_name VARCHAR(30) NOT NULL, username VARCHAR(20) NOT NULL,email TEXT(50) NULL, password VARCHAR(20) NOT NULL,  PRIMARY KEY (teacher_id), UNIQUE (username))")
-                db.commit()
-
-                print("\nCreating subjects table")
-                cursor.execute(
-                    "CREATE TABLE subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (id))")
-                db.commit()
-
-                # creating foreign key for subjects and teachers for teacher_id
-                cursor.execute(
-                    "ALTER TABLE subjects ADD FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL ON UPDATE CASCADE")
-                db.commit()
-
-                # creating table to store students semester count, year start and expected year of graduation
-                print("\nCreating students table")
-                cursor.execute("CREATE TABLE students_batch (start_year INT NOT NULL AUTO_INCREMENT, grad_year INT, students INT NOT NULL DEFAULT 0, lat_students INT DEFAULT 0, tot_students INT DEFAULT 0, cur_semester INT DEFAULT 1, PRIMARY KEY (start_year))")
-                db.commit()
-                print("\nstudents_batch, teachers and subjects table successfully created\n")
-
-            else:
-                print("Main tables seem to already have been created\n")
-                input("Press anything to continue...")
-                os.system('cls')
-                continue
-
-        elif choice == 'Show tables':  # showing all table names and details about them
+        if choice == 'Show tables':  # showing all table names and details about them
             os.system('cls')
             while True:
                 print("Showing and describing details in a table\n")
@@ -1219,6 +1332,7 @@ def admin_session():
                 tables = [x[0] for x in cursor.fetchall()]
                 tables.append("Go Back")
 
+                print("Which table?\n")
                 choice = questionary.select("Choices: ", choices=tables).ask()
                 if choice == 'Go Back':
                     os.system('cls')
@@ -1237,11 +1351,45 @@ def admin_session():
                     os.system('cls')
                     print(f"{choice} details shown\n")
 
+        elif choice == "Manage courses":  # adding or modifying courses
+            os.system('cls')
+            while True:
+                print("Managing courses\n")
+
+                choice = questionary.select("Choices: ", choices=["Add a course",
+                                                                  "Go Back"]).ask()
+                if choice == "Add a course":
+                    print("\nAdding a course\n")
+                    while True:
+                        try:
+                            id = input("Enter course id : ").replace(' ', '_')
+                            name = input("Full name of course : ")
+                            founded = int(input("What year was the course founded? : "))
+                            length = int(input("How many years does the course last? : "))
+                            department = input("Which department does this course belong to? : ")
+                            department_head = input("Name of department head : ")
+
+                            cursor.execute(
+                                f"INSERT INTO courses.courses VALUES ('{id}', '{name}', {founded}, {length}, '{department}', '{department_head}')")
+                            db.commit()
+                            print(f"{id}, {name} successfully added\n")
+                            input("Press anything to continue")
+                            os.system('cls')
+                            break
+                        except:
+                            print("Enter appropriate values for each field...\n")
+
+                else:
+                    os.system('cls')
+                    print("Going back...\n")
+                    break
+
         elif choice == 'Manage subjects':  # adding or deleting a subject
             os.system('cls')
             while True:
                 print("Managing subjects\n")
 
+                print("What to do?\n")
                 choice = questionary.select("Choices: ", choices=["Add a subject",
                                                                   "Delete a subject",
                                                                   "Go Back"]).ask()
@@ -1353,47 +1501,51 @@ def admin_session():
                                     for table in tables:
                                         table = f"students_{table}"
                                         new_table = f"{table}_{subj_name}"
-                                        tests = []
-                                        cursor.execute(f"SELECT type, amount FROM {table_name}")
-                                        # getting the column names of tests for subject
-                                        for x in cursor.fetchall():
-                                            if x[1] > 1:
-                                                for y in range(1, x[1]+1):
-                                                    tests.append(f"{x[0]}_{y}")
-                                            else:
-                                                tests.append(x[0])
 
-                                        # creating new mark sheet for students doing that particular subject
-                                        cursor.execute(f"CREATE TABLE {new_table} (student_id INT(5) PRIMARY KEY)")
-                                        db.commit()
+                                        cursor.execute(f"SHOW TABLES LIKE '{new_table}'")
+                                        # excluding student records who already have the marksheet for this subject
+                                        if len([x[0] for x in cursor.fetchall()]) < 1:
+                                            tests = []
+                                            cursor.execute(f"SELECT type, amount FROM {table_name}")
+                                            # getting the column names of tests for subject
+                                            for x in cursor.fetchall():
+                                                if x[1] > 1:
+                                                    for y in range(1, x[1]+1):
+                                                        tests.append(f"{x[0]}_{y}")
+                                                else:
+                                                    tests.append(x[0])
 
-                                        # adding foreign key to link student ids together
-                                        cursor.execute(
-                                            f"ALTER TABLE {new_table} ADD FOREIGN KEY (student_id) REFERENCES {table}(id) ON DELETE CASCADE ON UPDATE CASCADE")
-                                        db.commit()
-
-                                        # adding columns of tests and making the default marks 0
-                                        for test in tests:
-                                            cursor.execute(f"ALTER TABLE {new_table} ADD {test} INT(3) NOT NULL DEFAULT 0")
+                                            # creating new mark sheet for students doing that particular subject
+                                            cursor.execute(f"CREATE TABLE IF NOT EXISTS {new_table} (student_id INT(5) PRIMARY KEY)")
                                             db.commit()
 
-                                        # custom columns to store predictor variables
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD PASS_CHANCE FLOAT NOT NULL DEFAULT 0")
-                                        db.commit()
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
-                                        db.commit()
-                                        cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
-                                        db.commit()
-
-                                        # adding each student id for each student record table and this subject
-                                        cursor.execute(f"SELECT id FROM {table}")
-                                        for x in [x[0] for x in cursor.fetchall()]:
-                                            cursor.execute(f"INSERT INTO {new_table} (student_id) VALUES ({x})")
+                                            # adding foreign key to link student ids together
+                                            cursor.execute(
+                                                f"ALTER TABLE {new_table} ADD FOREIGN KEY (student_id) REFERENCES {table}(id) ON DELETE CASCADE ON UPDATE CASCADE")
                                             db.commit()
 
-                                        cursor.execute(
-                                            f"CREATE TRIGGER {new_table} AFTER INSERT ON {table} FOR EACH ROW INSERT INTO {new_table} (student_id) values (new.id)")
-                                        db.commit()
+                                            # adding columns of tests and making the default marks 0
+                                            for test in tests:
+                                                cursor.execute(f"ALTER TABLE {new_table} ADD {test} INT(3) NOT NULL DEFAULT 0")
+                                                db.commit()
+
+                                            # custom columns to store predictor variables
+                                            cursor.execute(f"ALTER TABLE {new_table} ADD PASS_CHANCE FLOAT NOT NULL DEFAULT 0")
+                                            db.commit()
+                                            cursor.execute(f"ALTER TABLE {new_table} ADD PREDICTED_GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                                            db.commit()
+                                            cursor.execute(f"ALTER TABLE {new_table} ADD GRADE VARCHAR(10) NOT NULL DEFAULT 0")
+                                            db.commit()
+
+                                            # adding each student id for each student record table and this subject
+                                            cursor.execute(f"SELECT id FROM {table}")
+                                            for x in [x[0] for x in cursor.fetchall()]:
+                                                cursor.execute(f"INSERT INTO {new_table} (student_id) VALUES ({x})")
+                                                db.commit()
+
+                                            cursor.execute(
+                                                f"CREATE TRIGGER {new_table} AFTER INSERT ON {table} FOR EACH ROW INSERT INTO {new_table} (student_id) values (new.id)")
+                                            db.commit()
 
                                     print(f"Grades sheets for {subj_name} created\n")
                                     input("Press anything to continue...")
@@ -1429,10 +1581,11 @@ def admin_session():
                     os.system('cls')
                     print("Deleting a subject\n")
                     cursor.execute("SELECT id FROM subjects")
-                    _ = [x[0] for x in cursor.fetchall()]
-                    _.append("Go Back")
+                    subjects = [x[0] for x in cursor.fetchall()]
+                    subjects.append("Go Back")
 
-                    choice = questionary.select("Choices: ", choices=_).ask()
+                    print("Which subject to delete?\n")
+                    choice = questionary.select("Choices: ", choices=subjects).ask()
 
                     if choice == "Go Back":
                         os.system('cls')
@@ -1489,6 +1642,7 @@ def admin_session():
             while True:
                 print("Managing teacher accounts\n")
 
+                print("What to do?\n")
                 choice = questionary.select("Choices: ", choices=["Add a teacher account",
                                                                   "Delete a teacher account",
                                                                   "Go Back"]).ask()
@@ -1538,6 +1692,7 @@ def admin_session():
             while True:
                 print("Managing student accounts/records\n")
 
+                print("What to do?\n")
                 choice = questionary.select("Choices: ", choices=["Create new student records for new batch",
                                                                   "Add a student account",
                                                                   "Delete a student account",
@@ -1564,7 +1719,7 @@ def admin_session():
                         table = f"students_{year}"  # name of new student records
                         # creating student record for that batch
                         cursor.execute(
-                            f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) NOT NULL, password VARCHAR(20) NOT NULL, start_year INT NOT NULL DEFAULT {int(year)},start_sem INT NOT NULL DEFAULT 1, cur_semester INT NOT NULL DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
+                            f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) UNIQUE NOT NULL, password VARCHAR(20) NOT NULL, start_year INT NOT NULL DEFAULT {int(year)},start_sem INT NOT NULL DEFAULT 1, cur_semester INT NOT NULL DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
                         db.commit()
 
                         # foreign key referencing students_batch table to student record
@@ -1659,6 +1814,8 @@ def admin_session():
                     cursor.execute("SELECT start_year FROM students_batch")
                     choices = [str(x[0]) for x in cursor.fetchall()]
                     choices.append("Go Back")
+
+                    print("Which batch?\n")
                     choice = questionary.select("Choice: ", choices=choices).ask()
 
                     if choice != "Go Back":
@@ -1721,6 +1878,8 @@ def admin_session():
                     cursor.execute("SELECT start_year FROM students_batch")
                     choices = [str(x[0]) for x in cursor.fetchall()]
                     choices.append("Go Back")
+
+                    print("Which batch?\n")
                     choice = questionary.select("Choices: ", choices=choices).ask()
 
                     if choice != "Go Back":
@@ -1768,6 +1927,84 @@ def admin_session():
                     print("Going back...\n")
                     break
 
+        elif choice == "Manage my account details":  # checking account details for this admin account
+            print("Viewing account details\n")
+            cursor.execute("DESC courses.admins")
+            cols = [x[0] for x in cursor.fetchall()]
+
+            cursor.execute(f"SELECT * FROM courses.admins WHERE courses.admins.username = '{user}'")
+            details = cursor.fetchall()[0]
+
+            # asking whether to view or change account details
+            choice = questionary.select("Choice : ", choices=["View account details", "Change account details", "Go Back"]).ask()
+            if choice == "View account details":
+                [print(f"{cols[x]} -> {details[x]}") for x in range(len(cols))]
+                print(f"\nAccount details shown for {user}")
+                input("\nPress anything to continue...\n")
+                os.system('cls')
+
+            elif choice == "Change account details":
+                cursor.execute("DESC courses.admins")
+
+                # getting account details that can be changed
+                cols = [x[0] for x in cursor.fetchall() if x[0] not in ['id', 'email']]
+                cols.append("Go Back")
+
+                print("Which detail to change?\n")
+                col = questionary.select("Choice : ", cols).ask()
+
+                if col != "Go Back":
+                    while True:
+                        try:
+                            cursor.execute(f"SELECT id FROM courses.admins WHERE username = '{user}'")
+                            id = cursor.fetchall()[0][0]
+
+                            cursor.execute(f"SELECT {col} FROM courses.admins WHERE username = '{user}'")
+                            old_detail = cursor.fetchall()[0][0]
+                            new_detail = input(f"\nOld {col} -> {old_detail}\nNew {col} -> ")
+
+                            cursor.execute(f"UPDATE courses.admins SET courses.admins.{col} = '{new_detail}' WHERE courses.admins.username = '{user}'")
+                            db.commit()
+
+                            cursor.execute(f"SELECT username FROM courses.admins WHERE id = '{id}'")
+                            user = cursor.fetchall()[0][0]
+                            os.system('cls')
+                            print(f"{col} changed for {user}\n")
+                            break
+                        except:
+                            print("Enter valid input...\n")
+
+                else:
+                    os.system('cls')
+                    print("Going back...\n")
+                    continue
+
+            elif choice == "Go Back":
+                os.system('cls')
+                print("Going back...\n")
+                continue
+
+        elif choice == "Add admin account":  # add an admin account
+            print("Adding an admin account\n")
+            os.system('cls')
+
+            while True:
+                try:
+                    first_name = input("Enter first name : ")
+                    last_name = input("Enter last name : ")
+                    username = input("Enter username : ")
+                    passw = input("Enter password : ")
+                    email = f"{username}_admin@dypiu.ac.in"
+
+                    cursor.execute(
+                        f"INSERT INTO courses.admins (first_name, last_name, username, password, email, added_by) VALUES ('{first_name}', '{last_name}', '{username}', '{passw}', '{email}', '{user}')")
+                    db.commit()
+                    print(f"{username} has been added as an admin\n")
+                    os.system('cls')
+                    break
+                except:
+                    print("Enter valid details...\n")
+
         elif choice == 'Logout':
             os.system('cls')
             print("Logging out...\n")
@@ -1776,15 +2013,150 @@ def admin_session():
 
 def admin_auth():
     print("Admin Login\n")
-    if input("Username : ") == 'admin' and stdiomask.getpass(prompt='Password : ') == '1234':
+    cursor.execute("SELECT username, password FROM courses.admins")
+    login_info = dict()
+    for x in cursor.fetchall():
+        login_info[x[0]] = x[1]
+
+    valid_login = False
+    user = input("Username: ")
+    passw = stdiomask.getpass(prompt="Password: ")
+
+    if user in login_info.keys():
+        if login_info[user] == passw:
+            valid_login = True
+            os.system('cls')
+            admin_session(user)
+
+    if valid_login == False:
         os.system('cls')
-        admin_session()
+        print("Invalid admin login details...\n")
+
+
+def course_select():  # accessing tables in database courses to select a course to access
+    cursor.execute("SHOW DATABASES LIKE 'courses'")
+    dbs = [x[0] for x in cursor.fetchall()]
+
+    if len(dbs) < 1:  # if no database 'courses' is found, creating it and adding necessary tables with initial values for them
+        print("No courses database found, creating one...\n")
+        # creating courses database if it doesn't exist
+        cursor.execute("CREATE DATABASE courses")
+        db.commit()
+
+        cursor.execute("USE courses")
+        db.commit()
+
+        # creating table in courses database to store courses
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS courses (id VARCHAR(10) NOT NULL, name TEXT, founded INT, length INT, department TEXT DEFAULT NULL, department_head TEXT DEFAULT NULL, PRIMARY KEY(id))")
+        db.commit()
+
+        # adding a course into the table
+        print("Courses database created, input details for a course for courses table: \n")
+        while True:
+            try:
+                id = input("Enter course id : ").replace(' ', '_')
+                name = input("Full name of course : ")
+                founded = int(input("What year was the course founded? : "))
+                length = int(input("How many years does the course last? : "))
+                department = input("Which department does this course belong to? : ")
+                department_head = input("Name of department head : ")
+
+                cursor.execute(f"INSERT INTO courses.courses VALUES ('{id}', '{name}', {founded}, {length}, '{department}', '{department_head}')")
+                db.commit()
+                print(f"{id}, {name} successfully added\n")
+                break
+            except:
+                print("Enter appropriate values for each field...\n")
+
+        # creating admins table
+        cursor.execute("CREATE TABLE IF NOT EXISTS admins (id INT AUTO_INCREMENT PRIMARY KEY, first_name TEXT DEFAULT NULL, last_name TEXT DEFAULT NULL, username VARCHAR(20) UNIQUE NOT NULL, password VARCHAR(20) NOT NULL, email TEXT NOT NULL, mobile VARCHAR(15) DEFAULT NULL, added_by VARCHAR(20) DEFAULT NULL)")
+        db.commit()
+
+        os.system('cls')
+        print("Admins table created, input details for admin to be added: \n")
+        while True:
+            try:
+                first_name = input("Enter first name : ")
+                last_name = input("Enter last name : ")
+                username = input("Enter username : ")
+                password = input("Enter password for admin : ")
+                email = f"{username}_admin@dypiu.ac.in"
+                cursor.execute(
+                    f"INSERT INTO admins (first_name, last_name, username, password, email) VALUES ('{first_name}', '{last_name}', '{username}', '{password}', '{email}')")
+                db.commit()
+                print(f"{username} added as an admin")
+                break
+                input("\nCourse database created, press anything to continue...\n")
+                os.system('cls')
+            except:
+                print("Enter appropriate values for each field...\n")
+
+    # accessing courses database
+    cursor.execute("USE courses")
+    db.commit()
+
+    # accessing course ids from courses table
+    cursor.execute("SELECT id FROM courses")
+    courses = [x[0] for x in cursor.fetchall()]
+    courses.append("Exit")
+
+    # choosing course
+    print("Select course:\n")
+    course = questionary.select("Choice : ", choices=courses).ask()
+
+    if course != "Exit":
+        cursor.execute(f"SELECT id, name, length FROM courses WHERE id = '{course}'")
+        return cursor.fetchall()[0]
     else:
-        os.system('cls')
-        print("Invalid admin login details\n")
+        exit("Bye!")
+
+
+def prerequisite_tables(database):
+    # creating database for course if it doesnt exist already
+    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {database}")
+    db.commit()
+
+    cursor.execute(f"USE {database}")
+    db.commit()
+
+    # creating prerequisite tables needed for the system to function if they dont exist already
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT, first_name VARCHAR(30) NOT NULL, last_name VARCHAR(30) NOT NULL, username VARCHAR(20) NOT NULL,email TEXT(50) NULL, password VARCHAR(20) NOT NULL,  PRIMARY KEY (teacher_id), UNIQUE (username))")
+    db.commit()
+
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (id))")
+    db.commit()
+
+    # creating foreign key for subjects and teachers for teacher_id
+    cursor.execute("SHOW TABLES LIKE 'subjects'")
+    if len([x[0] for x in cursor.fetchall()]) < 1:
+        cursor.execute(
+            "ALTER TABLE subjects ADD FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL ON UPDATE CASCADE")
+        db.commit()
+
+    # creating table to store students semester count, year start and expected year of graduation
+    cursor.execute("CREATE TABLE IF NOT EXISTS students_batch (start_year INT NOT NULL AUTO_INCREMENT, grad_year INT, students INT NOT NULL DEFAULT 0, lat_students INT DEFAULT 0, tot_students INT DEFAULT 0, cur_semester INT DEFAULT 1, PRIMARY KEY (start_year))")
+    db.commit()
 
 
 def main():
+    # running function to select a course (or add prerequisite tables for courses database)
+
+    global database
+    global course
+    global course_len
+    global path
+
+    database, course, course_len = map(str, course_select())
+    course_len = int(course_len)
+
+    prerequisite_tables(database)  # checking if prerequisite tables for the database are there, if not, create them
+
+    """ PATH TO SQL DATABASES STORED ON YOUR DEVICE """
+    path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"
+
     while True:
         choice = questionary.select(f"{course} Login Page", choices=["Admin Login",
                                                                      "Teacher Login",
@@ -1804,9 +2176,11 @@ def main():
             student_auth()
 
         else:
-            print("Bye!")
-            break
+            exit("Bye!")
 
 
 # war begins, ionia calls. hasagi
-main()
+if __name__ == "__main__":
+    db = mysql.connect(host='localhost', user='Ashwin', password='3431')  # initializing connection to MySQL
+    cursor = db.cursor(buffered=True)
+    main()
