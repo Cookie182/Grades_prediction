@@ -20,8 +20,10 @@ from sklearn.pipeline import make_pipeline
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec as gs
 
-from scipy import stats as ss  # to generate numbers from a given range of numbers with a Gaussian weight distribution
-from scipy.signal import savgol_filter  # add Savozky-Golay filler data to smoothen out lines on graphs
+# to generate numbers from a given range of numbers with a Gaussian weight distribution
+from scipy import stats as ss
+# add Savozky-Golay filler data to smoothen out lines on graphs
+from scipy.signal import savgol_filter
 
 plt.style.use('bmh')  # matplotlib graph style
 sns.set_style('dark')  # seaborn graph style
@@ -38,7 +40,7 @@ warnings.filterwarnings('ignore')  # to ignore messages from seaborn graphs
                                                     "* D = (>= 50%)"
                                                     "* F = (< 50%)"
         ""- BEFORE ANY OPERATIONS, A DATABASE MUST BE CREATED VIA SQL, THE NAME OF THE DATABASE SHOULD BE THE NAME OF THE COURSE""
-        "- THE 3 MAIN PREQUISITE TABLES, AS SHOWN IN THE FIRST OPTION IN THE ADMIN MENU (IT IS AUTOMATICALLY DONE AS SOON AS THE OPTION IS SELECTED TO RUN), ARE A MUST HAVE REQUIREMENT BEFORE CONDUCTING ANY TYPE OF OPERATIONS"
+        "- THE 3 MAIN PREQUISITE TABLES, AS SHOWN IN THE FIRST OPTION IN THE ADMIN MENU (IT IS AUTOMATICALLY DONE AS SOON AS THE OPTION IS SELECTED TO RUN), ARE A MUST HAVE REQUIREMENT BEFORE CONDUCTING ANY TYPE OF OPERATIONS"                                               
 """
 
 """ MAKE SURE THE DATABASE DETAILS, SQL DETAILS AND PATH DETAILS ARE CORRECT FOR YOU NEAR THE END"""
@@ -52,11 +54,13 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
 
     passfail_final, overallgrade_final = None, None
     passfail_final_acc, overallgrade_final_acc = 0, 0
-    for test_run in range(1, 6):  # generating mock data 5 times to find the models with the higehst accuracy
+    # generating mock data 5 times to find the models with the higehst accuracy
+    for test_run in range(1, 6):
         print(f"\nTest Run {test_run}\n")
         for x in range(len(test_type)):
             m = max_mark[x]  # storing max marks for each type of test
-            if test_amount[x] > 1:  # generating random marks in marking range with a gaussian weight distribution to each mark
+            # generating random marks in marking range with a gaussian weight distribution to each mark
+            if test_amount[x] > 1:
                 # mew = 65% of max mark and sigma = a third of max mark
                 for y in range(1, test_amount[x] + 1):
                     df[f"{test_type[x]} {y}"] = [round(x) for x in (ss.truncnorm.rvs(((0 - int(m * 0.65)) / (m//3)),
@@ -89,15 +93,13 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y['Pass/Fail'])
 
         # passing probability predictor
-        passfail = make_pipeline(StandardScaler(),
-                                 LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
-                                                      cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
-                                                      max_iter=1000, n_jobs=-1, refit=True,
-                                                      random_state=7,
-                                                      class_weight='balanced')).fit(X_test, y_test['Pass/Fail'])
+        passfail = make_pipeline(StandardScaler(), LogisticRegressionCV(Cs=np.arange(0.1, 1.1, 0.1),
+                                                                        cv=RepeatedStratifiedKFold(n_splits=10, random_state=7),
+                                                                        max_iter=1000, n_jobs=-1, refit=True, random_state=7,
+                                                                        class_weight='balanced')).fit(X_train, y_train['Pass/Fail'])
 
         # final overall grade predictor
-        overallgrade = make_pipeline(StandardScaler(), LinearRegression(n_jobs=-1)).fit(X_test, y_test['Total %'])
+        overallgrade = make_pipeline(StandardScaler(), LinearRegression(n_jobs=-1)).fit(X_train, y_train['Total %'])
         print("Models created")
 
         pf_score = np.round(passfail.score(X_test, y_test['Pass/Fail'])*100, 2)
@@ -116,7 +118,8 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
 
     if graphs == True:  # if explicitly stated to show the graphs of the distribution of grades
         for x in range(len(test_type)):
-            if test_amount[x] > 1:  # plotting grade distribution for tests with more than one evaluation of that type
+            # plotting grade distribution for tests with more than one evaluation of that type
+            if test_amount[x] > 1:
                 if test_amount[x] % 2 != 0:
                     y = test_amount[x]+1
                 else:
@@ -127,8 +130,7 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
                 for y in range(test_amount[x]):
                     ax = fig.add_subplot(grid[y])
                     sns.distplot(df.filter(regex=test_type[x]).iloc[:, y], fit=ss.norm, ax=ax, norm_hist=True, color='red',
-                                 hist_kws=dict(edgecolor='black', align='right', color='red'),
-                                 bins=max_mark[x]//2)
+                                 hist_kws=dict(edgecolor='black', align='right', color='red'), bins=max_mark[x]//2)
                     plt.xticks(size=10)
                     plt.yticks(size=12)
                     plt.xlabel('Marks', fontdict={'size': 13})
@@ -142,8 +144,7 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
             else:  # plotting grade distribution for singular evaluation test
                 plt.figure(figsize=(8, 5))
                 sns.distplot(df[test_type[x]], fit=ss.norm, norm_hist=True, color='red',
-                             hist_kws=dict(edgecolor='black', align='right', color='red'),
-                             bins=max_mark[x]//2)
+                             hist_kws=dict(edgecolor='black', align='right', color='red'), bins=max_mark[x]//2)
                 plt.title(f"Grade for {test_type[x]}", fontsize=14)
                 plt.xlabel('Marks', fontdict={'size': 13})
                 plt.xticks(size=12)
@@ -153,8 +154,7 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
                 plt.show()
 
         fig, ax = plt.subplots()
-        plot_confusion_matrix(passfail, X_test, y_test['Pass/Fail'], labels=[0, 1],
-                              display_labels=['Fail', 'Pass'], cmap='afmhot', ax=ax)
+        plot_confusion_matrix(passfail, X_test, y_test['Pass/Fail'], labels=[0, 1], display_labels=['Fail', 'Pass'], cmap='afmhot', ax=ax)
         plt.rcParams.update({'font.size': 18})
         ax.set_title('Confusion Matrix')
         plt.show()
@@ -163,14 +163,18 @@ def grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test
     return passfail_final, overallgrade_final
 
 
-def rolling_predict(marks, subject, record):  # to present rolling predictions based on a student's marks
-    all_marks = marks  # saved to calculate rolling actual grade (calculated with subject structure details)
-    marks = np.array(marks[:-1]).reshape(1, -1)  # prepping data to be used for predictions
+# to present rolling predictions based on a student's marks
+def rolling_predict(marks, subject, record):
+    # saved to calculate rolling actual grade (calculated with subject structure details)
+    all_marks = marks
+    # prepping data to be used for predictions
+    marks = np.array(marks[:-1]).reshape(1, -1)
     # loading subject prediction models
     passfail = pickle.load(open(f"{path}/{subject}_passfail", 'rb'))
     overallgrade = pickle.load(open(f"{path}/{subject}_overallgrade", 'rb'))
 
-    dummy = [0] * len(marks[0])  # making dummy list to cummulatively add each test score
+    # making dummy list to cummulatively add each test score
+    dummy = [0] * len(marks[0])
     pass_probabs = []  # to store each probability as each test score gets entered
     for x in range(len(marks[0])):
         dummy[x] = marks[0][x]  # blink
@@ -182,7 +186,8 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
         pass_probabs_l -= 1
     pass_probabs = savgol_filter(pass_probabs, pass_probabs_l, 4)
 
-    limit1 = math.ceil(max([abs(x - 50) for x in pass_probabs]))  # limits determiend to scale the pass/fail graph better
+    # limits determiend to scale the pass/fail graph better
+    limit1 = math.ceil(max([abs(x - 50) for x in pass_probabs]))
 
     pf = None  # predicting if in the end the model predicts student failing or passing
     if passfail.predict(marks) == 0:
@@ -203,7 +208,8 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
 
     total_percent = savgol_filter(total_percent, total_percent_l, 4)
 
-    limit2 = math.ceil(max([abs(x-60) for x in total_percent]))  # limits determined to scale the overall grade graph better
+    # limits determined to scale the overall grade graph better
+    limit2 = math.ceil(max([abs(x-60) for x in total_percent]))
 
     # calculating grade
     grade_p = overallgrade.predict(marks)[0]*100
@@ -254,7 +260,8 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
 
     actual_grades = savgol_filter(actual_grades, actual_grades_l, 4)
 
-    limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))  # limits determined to scale the overall grade graph better
+    # limits determined to scale the overall grade graph better
+    limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))
 
     actual_grade = None
     if actual_grades[-1] >= 90:
@@ -276,13 +283,13 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
 
     fig = plt.figure(f"Grade prediction and calculation for {subject}", figsize=(10, 5))
     grid = gs(nrows=2, ncols=2, figure=fig)
-    plt.suptitle(
-        f"Chance of Passing and Predicted Total Grade for {subject}\nTake the predictions with a grain of salt", fontsize=12)
-    ax1 = fig.add_subplot(grid[0, 0])
+    plt.suptitle(f"Chance of Passing and Predicted Total Grade for {subject}\nTake the predictions with a grain of salt", fontsize=12)
+    fig.add_subplot(grid[0, 0])
     plt.title(f"Probability of passing the subject after each test taken\nPredicted Pass or Fail? -> {pf}\
     \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=11)
     plt.axhline(50, color='r', label="Threshold", linestyle='--')
-    plt.plot(tests[:-1], pass_probabs, c='black', lw=1, label='Predicted passing chance')
+    plt.plot(tests[:-1], pass_probabs, c='black',
+             lw=1, label='Predicted passing chance')
     plt.yticks(fontsize=8)
     plt.xticks(fontsize=8, rotation=45)
     plt.ylabel('Probability (%)', fontsize=9)
@@ -291,7 +298,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     plt.legend(loc='best', fontsize=7)
     plt.tight_layout()
 
-    ax2 = fig.add_subplot(grid[0, 1])
+    fig.add_subplot(grid[0, 1])
     plt.title(
         f"Predicting Overall grade after each test\nPredicted Overall Subject Grade (out of 100)-> {grade_p:.2f}\nPredicted Grade -> {grade}", fontsize=11)
     plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
@@ -304,7 +311,7 @@ def rolling_predict(marks, subject, record):  # to present rolling predictions b
     plt.legend(loc='best', fontsize=7)
     plt.tight_layout()
 
-    ax3 = fig.add_subplot(grid[1, :])
+    fig.add_subplot(grid[1, :])
     plt.title(f"Actual Rolling Total Mark (out of 100) calculated for {subject} -> {actual_calc_grade} ({actual_grade})", fontsize=11)
     plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
     plt.plot(tests, actual_grades, c='black', lw=1, label='Caculated Grade (After each test)')
@@ -377,7 +384,7 @@ def student_session(record, user):
                 if choice == "View more info":  # to show prediction results graphs
                     cursor.execute(f"DESCRIBE {record}_{subject}")
                     tests = [x[0] for x in cursor.fetchall()][1:-3]
-                    for test in tests:  # iterating and getting marks for tests except for the final test
+                    for test in tests:  # iterating and getting marks for tests except for the final  test
                         cursor.execute(f"SELECT {test} FROM {record}_{subject} WHERE student_id = {id}")
                         marks.append(cursor.fetchall()[0][0])
                     rolling_predict(marks, subject, record)
@@ -391,7 +398,8 @@ def student_session(record, user):
                 print("Going back...\n")
                 continue
 
-        elif choice == "Show predictions with custom grades":  # taking custom grades for a subject and showing predictions based on them
+        # taking custom grades for a subject and showing predictions based on them
+        elif choice == "Show predictions with custom grades":
             os.system('cls')
             print("Show predictions with custom grades\n")
 
@@ -460,18 +468,22 @@ def student_session(record, user):
                 print("Going back...\n")
                 continue
 
-        elif choice == "View all subjects grades/details (including deleted ones)":  # showing marsheets for subjects that may have been deleted
+        # showing marsheets for subjects that may have been deleted
+        elif choice == "View all subjects grades/details (including deleted ones)":
             os.system('cls')
             while True:
                 print("Showing all subjects for student's batch\n")
                 cursor.execute(f"SHOW TABLES LIKE '{record}_%'")
 
                 # getting subjects from the names of all the marksheets for the student's batch
-                subjects = [str(x[0][len(record)+1:]).upper() for x in cursor.fetchall()]
+                subjects = [str(x[0][len(record)+1:]).upper()
+                            for x in cursor.fetchall()]
                 subjects.append("Go Back")
 
                 print("View grades or subject details?\n")
-                choice = questionary.select("Choices : ", choices=["View grades", "View subject details", "Go Back"]).ask()
+                choice = questionary.select("Choices : ", choices=["View grades",
+                                                                   "View subject details",
+                                                                   "Go Back"]).ask()
                 if choice == "View grades":
                     # getting subject choice
                     print("Which subject to view grade for?")
@@ -486,11 +498,13 @@ def student_session(record, user):
                         cols = [x[0] for x in cursor.fetchall()]
 
                         # getting data from marksheet for student
-                        cursor.execute(f"SELECT * FROM {record}_{subject} WHERE student_id = (SELECT id FROM {record} WHERE username = '{user}')")
+                        cursor.execute(
+                            f"SELECT * FROM {record}_{subject} WHERE student_id = (SELECT id FROM {record} WHERE username = '{user}')")
                         marks = cursor.fetchall()[0]
 
                         print(f"Showing your marks for {subject}\n")
-                        [print(f"{cols[x]} -> {marks[x]}") for x in range(len(cols))]
+                        [print(f"{cols[x]} -> {marks[x]}")
+                         for x in range(len(cols))]
                         input("Press anything to continue...\n")
                         os.system('cls')
 
@@ -571,18 +585,19 @@ def student_auth():
     records = [str(x[0]) for x in cursor.fetchall()]
     records.append("Go Back")
     print("\nWhich record do you belong to?\n")
-    record = questionary.select("Choices: ", choices=records).ask()  # choosing which student record they belong to
+    # choosing which student record they belong to
+    record = questionary.select("Choices: ", choices=records).ask()
     if record != "Go Back":
         record = f"students_{record}"
         user = input("Username : ")  # checking login details
         passw = stdiomask.getpass(prompt='Password : ')
 
         valid_login = False
-        cursor.execute(f"SELECT username FROM {record}")  # gathering all the student usernames from selected student record
+        # gathering all the student usernames from selected student record
+        cursor.execute(f"SELECT username FROM {record}")
         if user in [x[0] for x in cursor.fetchall()]:
             cursor.execute(f"SELECT password FROM {record} WHERE username = '{user}'")
             if passw == cursor.fetchall()[0][0]:
-
                 valid_login = True
                 student_session(record, user)  # launching student session
 
@@ -592,14 +607,15 @@ def student_auth():
 
     else:
         os.system('cls')
-        print("Incorrect choice for student record, going back...\n")
+        print("Going back...\n")
 
 
 def teacher_session(teacher_id):
     os.system('cls')
     while True:
         cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = {teacher_id}")
-        subjects = [x[0] for x in cursor.fetchall()]  # keeping a track of this particular teacher's
+        # keeping a track of this particular teacher's
+        subjects = [x[0] for x in cursor.fetchall()]
         subjects.append("Go Back")
         cursor.execute(f"SELECT first_name FROM teachers WHERE teacher_id = '{teacher_id}'")
         first_name = cursor.fetchall()[0][0]
@@ -627,7 +643,8 @@ def teacher_session(teacher_id):
             if choice != "Go Back":
                 print("")
                 subject = choice
-                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
+                cursor.execute(
+                    f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
                 # choosing for which batch to edit marks for
                 records = [str(x[0]) for x in cursor.fetchall()]
                 records.append("Go Back")
@@ -664,7 +681,8 @@ def teacher_session(teacher_id):
             # choosing for which subject to edit marks
             if subject != "Go Back":
                 print("")
-                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
+                cursor.execute(
+                    f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
                 # choosing for which batch to edit marks for
                 records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
@@ -684,7 +702,8 @@ def teacher_session(teacher_id):
                     type = questionary.select("Choices: ", choices=[x[0] for x in cursor.fetchall()]).ask()
 
                     print(' ')
-                    cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")  # getting amount for that test type
+                    # getting amount for that test type
+                    cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")
                     amount = int(cursor.fetchall()[0][0])
 
                     if amount == 1:
@@ -694,8 +713,10 @@ def teacher_session(teacher_id):
                         test = questionary.select("Choices: ", choices=[f"{type}_{x}" for x in range(1, amount+1)]).ask()
 
                     # loading subject prediction models
-                    passfail = pickle.load(open(f"{path}/{subject}_passfail", 'rb'))
-                    overallgrade = pickle.load(open(f"{path}/{subject}_overallgrade", 'rb'))
+                    passfail = pickle.load(
+                        open(f"{path}/{subject}_passfail", 'rb'))
+                    overallgrade = pickle.load(
+                        open(f"{path}/{subject}_overallgrade", 'rb'))
 
                     os.system('cls')
                     print(f"Editing marks of {test} for {record} for {subject}\n")
@@ -704,7 +725,8 @@ def teacher_session(teacher_id):
                     max_mark = int(cursor.fetchall()[0][0])
 
                     cursor.execute(f"SELECT student_id FROM {record}_{subject}")
-                    ids = [x[0] for x in cursor.fetchall()]  # iterating for each student
+                    # iterating for each student
+                    ids = [x[0] for x in cursor.fetchall()]
                     print("Enter marks\n")
                     for id in ids:
                         while True:
@@ -732,9 +754,12 @@ def teacher_session(teacher_id):
 
                         # converting to a 2d array so scikit-learn models can use them for predictions
                         mark = np.array(mark).reshape(1, -1)
-                        predict_passing = round(passfail.predict_proba(mark)[0][1]*100, 2)  # proabability of passing the subject
-                        predict_grade = round(overallgrade.predict(mark)[0]*100, 2)  # predicted grade of overall subject after finals
-                        predict_lettergrade = None  # giving letter based grade based on predicted overall percentage after finals
+                        # proabability of passing the subject
+                        predict_passing = round(passfail.predict_proba(mark)[0][1]*100, 2)
+                        # predicted grade of overall subject after finals
+                        predict_grade = round(overallgrade.predict(mark)[0]*100, 2)
+                        # giving letter based grade based on predicted overall percentage after finals
+                        predict_lettergrade = None
                         if predict_grade >= 90:
                             predict_lettergrade = 'A+'
                         elif predict_grade >= 80:
@@ -818,7 +843,8 @@ def teacher_session(teacher_id):
             # choosing for which subject to edit marks
             if subject != "Go Back":
                 print("")
-                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
+                cursor.execute(
+                    f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
                 # choosing for which batch to edit marks for
                 record = [str(x[0]) for x in cursor.fetchall()]
                 if len(record) < 1:
@@ -833,7 +859,8 @@ def teacher_session(teacher_id):
                 if choice != "Go Back":
                     record = f"students_{choice}"
                     print("\nChoose student id to edit marks for : \n")
-                    cursor.execute(f"SELECT student_id FROM {record}_{subject}")  # choosing student
+                    # choosing student
+                    cursor.execute(f"SELECT student_id FROM {record}_{subject}")
                     ids = [str(x[0]) for x in cursor.fetchall()]
                     ids.append("Go Back")
 
@@ -845,7 +872,8 @@ def teacher_session(teacher_id):
                         type = questionary.select("Choices: ", choices=[x[0] for x in cursor.fetchall()]).ask()
 
                         print(' ')
-                        cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")  # getting amount for that test type
+                        # getting amount for that test type
+                        cursor.execute(f"SELECT amount FROM {subject}_details WHERE type = '{type}'")
                         amount = int(cursor.fetchall()[0][0])
 
                         if amount == 1:
@@ -873,9 +901,12 @@ def teacher_session(teacher_id):
                         # converting to a 2d array so scikit-learn models can use them for predictions
                         mark = np.array(mark).reshape(1, -1)
                         print(mark)
-                        predict_passing = round(passfail.predict_proba(mark)[0][1]*100, 2)  # proabability of passing the subject
-                        predict_grade = round(overallgrade.predict(mark)[0]*100, 2)  # predicted grade of overall subject after finals
-                        predict_lettergrade = None  # giving letter based grade based on predicted overall percentage after finals
+                        # proabability of passing the subject
+                        predict_passing = round(passfail.predict_proba(mark)[0][1]*100, 2)
+                        # predicted grade of overall subject after finals
+                        predict_grade = round(overallgrade.predict(mark)[0]*100, 2)
+                        # giving letter based grade based on predicted overall percentage after finals
+                        predict_lettergrade = None
                         if predict_grade >= 90:
                             predict_lettergrade = 'A+'
                         elif predict_grade >= 80:
@@ -950,7 +981,8 @@ def teacher_session(teacher_id):
                 os.system('cls')
                 print("Incorrect choice for subject selection, going back...\n")
 
-        elif choice == "List Passing/Failing students":  # list the students who are actually and predicted to passing/failing
+        # list the students who are actually and predicted to passing/failing
+        elif choice == "List Passing/Failing students":
             os.system('cls')
             print("Listing students who are actually and predicted to pass/fail\n")
             cursor.execute(f"SELECT id FROM subjects WHERE teacher_id = '{teacher_id}'")
@@ -961,7 +993,8 @@ def teacher_session(teacher_id):
             subject = questionary.select("Choices: ", choices=subjects).ask()
 
             if subject != "Go Back":
-                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
+                cursor.execute(
+                    f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id = '{subject}')")
                 records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
                     os.system('cls')
@@ -993,7 +1026,8 @@ def teacher_session(teacher_id):
                         print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
-                    elif choice == "Calculated Grades":  # actual grades (so far)
+                    # actual grades (so far)
+                    elif choice == "Calculated Grades":
                         os.system('cls')
                         print(f"Showing students in {records[0][1]} and their actual grades (so far) in {subject}\n")
                         print("Going to pass:")
@@ -1025,7 +1059,8 @@ def teacher_session(teacher_id):
             subject = questionary.select("Choices: ", choices=subjects).ask()
 
             if subject != "Go Back":
-                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
+                cursor.execute(
+                    f"SELECT start_year FROM students_batch WHERE cur_semester >= (SELECT semester FROM subjects WHERE id='{subject}')")
                 records = [str(x[0]) for x in cursor.fetchall()]
                 if len(records) < 1:
                     os.system('cls')
@@ -1035,12 +1070,11 @@ def teacher_session(teacher_id):
                 print("Which batch?\n")
                 record = questionary.select("Choices: ", choices=records).ask()
                 # getting the predicted and actual grades
-                df = pd.read_sql(f"SELECT * FROM students_{record}_{subject}",
-                                 db, index_col='student_id')[['PREDICTED_GRADE', 'GRADE']]
+                df = pd.read_sql(f"SELECT * FROM students_{record}_{subject}", db, index_col='student_id')[['PREDICTED_GRADE', 'GRADE']]
 
                 try:
                     # prediction grades
-                    pred_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x.split()[0]) for x in df['PREDICTED_GRADE']]])  # numerical grade
+                    pred_grade_p = np.array([1 if x >= 60 else 0 for x in [float(x.split()[0]) for x in df['PREDICTED_GRADE']]])
                     pred_grade_l = np.array([x.split()[1][1] for x in df['PREDICTED_GRADE']])  # letter grade
 
                     # actual grades (manually calculated)
@@ -1068,13 +1102,15 @@ def teacher_session(teacher_id):
                 # actual grades
                 fig.add_subplot(223)
                 plt.title("Actual Pass/Fail", fontsize=12)
-                plt.pie([np.count_nonzero(actual_grade_p == 1), np.count_nonzero(actual_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
+                plt.pie([np.count_nonzero(actual_grade_p == 1),
+                         np.count_nonzero(actual_grade_p == 0)], labels=['Pass', 'Fail'], autopct='%.2f%%')
                 plt.legend(loc='best')
                 plt.tight_layout()
 
                 fig.add_subplot(224)
                 plt.title("Actual Letter Grades", fontsize=12)
-                plt.pie([np.count_nonzero(actual_grade_l == x) for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
+                plt.pie([np.count_nonzero(actual_grade_l == x)
+                        for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
                 plt.legend(loc='best')
                 plt.tight_layout()
                 plt.show()
@@ -1159,7 +1195,8 @@ def teacher_session(teacher_id):
             # amount of tests per each type of evaluation
             while True:
                 try:
-                    test_amount = tuple(int(input(f"How many tests for {x}?: ")) for x in test_type)  # amount of tests per evaluation
+                    # amount of tests per evaluation
+                    test_amount = tuple(int(input(f"How many tests for {x}?: ")) for x in test_type)
                     print(' ')
                     break
                 except:
@@ -1168,8 +1205,7 @@ def teacher_session(teacher_id):
             # max mark for each type of evaluation
             while True:
                 try:
-                    max_mark = tuple(int(input(f"{x} out of how many marks?: "))
-                                     for x in test_type)  # maximum marks for each type of tests
+                    max_mark = tuple(int(input(f"{x} out of how many marks?: ")) for x in test_type)  # maximum marks for each type of tests
                     print(' ')
                     break
                 except:
@@ -1209,12 +1245,10 @@ def teacher_session(teacher_id):
             cursor.execute(f"DROP TABLE {subject}_details")
             db.commit()
 
-            cursor.execute(
-                f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
+            cursor.execute(f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
             db.commit()
 
-            passfail, overallgrade = grades(test_type, test_amount, max_mark,
-                                            weightage, pass_percent, final_test_name)
+            passfail, overallgrade = grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test_name)
 
             with open(f"{path}/{subject}_passfail", 'wb') as f:
                 pickle.dump(passfail, f)
@@ -1297,13 +1331,15 @@ def teacher_auth():
 
     # checking if both username AND password match respectively
     valid_login = False
-    cursor.execute("SELECT username FROM teachers")  # gathering all the teacher usernames
+    # gathering all the teacher usernames
+    cursor.execute("SELECT username FROM teachers")
     if user in [x[0] for x in cursor.fetchall()]:
         cursor.execute(f"SELECT password FROM teachers WHERE username = '{user}'")
         if passw == cursor.fetchall()[0][0]:
             cursor.execute(f"SELECT teacher_id FROM teachers WHERE username = '{user}'")
             valid_login = True
-            teacher_session(cursor.fetchall()[0][0])  # launching teacher session for teacher
+            # launching teacher session for teacher
+            teacher_session(cursor.fetchall()[0][0])
 
     if valid_login == False:
         os.system('cls')
@@ -1364,8 +1400,10 @@ def admin_session(user):
                         try:
                             id = input("Enter course id : ").replace(' ', '_')
                             name = input("Full name of course : ")
-                            founded = int(input("What year was the course founded? : "))
-                            length = int(input("How many years does the course last? : "))
+                            founded = int(
+                                input("What year was the course founded? : "))
+                            length = int(
+                                input("How many years does the course last? : "))
                             department = input("Which department does this course belong to? : ")
                             department_head = input("Name of department head : ")
 
@@ -1433,7 +1471,8 @@ def admin_session(user):
                                 # amount of tests per each type of evaluation
                                 while True:
                                     try:
-                                        test_amount = tuple(int(input(f"How many tests for {x}?: ")) for x in test_type)  # amount of tests per evaluation
+                                        # amount of tests per evaluation
+                                        test_amount = tuple(int(input(f"How many tests for {x}?: ")) for x in test_type)
                                         print(' ')
                                         break
                                     except:
@@ -1442,8 +1481,8 @@ def admin_session(user):
                                 # max mark for each type of evaluation
                                 while True:
                                     try:
-                                        max_mark = tuple(int(input(f"{x} out of how many marks?: "))
-                                                         for x in test_type)  # maximum marks for each type of tests
+                                        # maximum marks for each type of tests
+                                        max_mark = tuple(int(input(f"{x} out of how many marks?: ")) for x in test_type)
                                         print(' ')
                                         break
                                     except:
@@ -1472,12 +1511,10 @@ def admin_session(user):
                                 # getting the name of the final test evaluation (the final test of the semester for the respective subject)
                                 final_test_name = test_type[-1]
 
-                                cursor.execute(
-                                    f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
+                                cursor.execute(f"CREATE TABLE {table_name} (Type VARCHAR(30), Amount INT(2), Weightage FLOAT, Max_mark INT(3))")
                                 db.commit()
 
-                                passfail, overallgrade = grades(test_type, test_amount, max_mark,
-                                                                weightage, pass_percent, final_test_name)
+                                passfail, overallgrade = grades(test_type, test_amount, max_mark, weightage, pass_percent, final_test_name)
 
                                 with open(f"{path}/{subj_name}_passfail", 'wb') as f:
                                     pickle.dump(passfail, f)
@@ -1493,8 +1530,7 @@ def admin_session(user):
                                 print(f"Details for {full_name} added\n")
 
                                 # getting appropriate student record
-                                cursor.execute(
-                                    f"SELECT start_year FROM students_batch WHERE cur_semester <= {semester}")
+                                cursor.execute(f"SELECT start_year FROM students_batch WHERE cur_semester <= {semester}")
                                 tables = [x[0] for x in cursor.fetchall()]
                                 if len(tables) > 0:
                                     # making marking sheets for subjects for all students who have a student record
@@ -1698,7 +1734,8 @@ def admin_session(user):
                                                                   "Delete a student account",
                                                                   "Go Back"]).ask()
 
-                if choice == "Create new student records for new batch":  # creating a new student records table for new batch and grade sheets
+                # creating a new student records table for new batch and grade sheets
+                if choice == "Create new student records for new batch":
                     os.system('cls')
                     print("Creating new student record\n")
                     while True:  # to get valid year input from user
@@ -1716,7 +1753,8 @@ def admin_session(user):
                         cursor.execute(f"INSERT INTO students_batch (start_year, grad_year) VALUES ({int(year)}, {int(year) + course_len})")
                         db.commit()
 
-                        table = f"students_{year}"  # name of new student records
+                        # name of new student records
+                        table = f"students_{year}"
                         # creating student record for that batch
                         cursor.execute(
                             f"CREATE TABLE {table}(id INT(3) NOT NULL AUTO_INCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, mobile_no VARCHAR(15) DEFAULT NULL, email VARCHAR(40) DEFAULT NULL, username VARCHAR(20) UNIQUE NOT NULL, password VARCHAR(20) NOT NULL, start_year INT NOT NULL DEFAULT {int(year)},start_sem INT NOT NULL DEFAULT 1, cur_semester INT NOT NULL DEFAULT 1, entry VARCHAR(20) DEFAULT 'Normal', grad_year INT DEFAULT {int(year)+4}, PRIMARY KEY(id), UNIQUE(username))")
@@ -1758,8 +1796,10 @@ def admin_session(user):
                         cursor.execute("SELECT id FROM subjects")
                         subjects = [x[0] for x in cursor.fetchall()]
                         for subject in subjects:
-                            table_name = f"{subject}_details"  # name of subjects to iterate for making grade sheets
-                            new_table = f"{table}_{subject}"  # name of table to store grades on subject for new students
+                            # name of subjects to iterate for making grade sheets
+                            table_name = f"{subject}_details"
+                            # name of table to store grades on subject for new students
+                            new_table = f"{table}_{subject}"
 
                             tests = []
                             cursor.execute(f"SELECT type, amount FROM {table_name}")
@@ -1858,8 +1898,7 @@ def admin_session(user):
 
                                 cursor.execute(f"SELECT students + lat_students FROM students_batch WHERE start_year = {int(year)}")
                                 tot_students = cursor.fetchall()[0][0]
-                                cursor.execute(
-                                    f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(year)}")
+                                cursor.execute(f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {int(year)}")
                                 db.commit()
                                 os.system('cls')
                                 print(f"{user} has been added as a student for the {year} batch\n")
@@ -1904,11 +1943,9 @@ def admin_session(user):
                             cursor.execute(
                                 f"CREATE TRIGGER semester_count_{year} AFTER UPDATE ON students_batch FOR EACH ROW UPDATE students_{int(year)} SET cur_semester = (SELECT cur_semester FROM students_batch WHERE start_year = {year})")
 
-                            cursor.execute(
-                                f"SELECT students + lat_students FROM students_batch WHERE start_year = {year}")
+                            cursor.execute(f"SELECT students + lat_students FROM students_batch WHERE start_year = {year}")
                             tot_students = cursor.fetchall()[0][0]
-                            cursor.execute(
-                                f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {year}")
+                            cursor.execute(f"UPDATE students_batch SET tot_students = {tot_students} WHERE start_year = {year}")
                             db.commit()
 
                             os.system('cls')
@@ -1963,7 +2000,8 @@ def admin_session(user):
                             old_detail = cursor.fetchall()[0][0]
                             new_detail = input(f"\nOld {col} -> {old_detail}\nNew {col} -> ")
 
-                            cursor.execute(f"UPDATE courses.admins SET courses.admins.{col} = '{new_detail}' WHERE courses.admins.username = '{user}'")
+                            cursor.execute(
+                                f"UPDATE courses.admins SET courses.admins.{col} = '{new_detail}' WHERE courses.admins.username = '{user}'")
                             db.commit()
 
                             cursor.execute(f"SELECT username FROM courses.admins WHERE id = '{id}'")
@@ -2062,7 +2100,8 @@ def course_select():  # accessing tables in database courses to select a course 
                 department = input("Which department does this course belong to? : ")
                 department_head = input("Name of department head : ")
 
-                cursor.execute(f"INSERT INTO courses.courses VALUES ('{id}', '{name}', {founded}, {length}, '{department}', '{department_head}')")
+                cursor.execute(
+                    f"INSERT INTO courses.courses VALUES ('{id}', '{name}', {founded}, {length}, '{department}', '{department_head}')")
                 db.commit()
                 print(f"{id}, {name} successfully added\n")
                 break
@@ -2087,10 +2126,11 @@ def course_select():  # accessing tables in database courses to select a course 
                 db.commit()
                 print(f"{username} added as an admin")
                 break
-                input("\nCourse database created, press anything to continue...\n")
-                os.system('cls')
             except:
                 print("Enter appropriate values for each field...\n")
+
+        input("\nCourse database created, press anything to continue...\n")
+        os.system('cls')
 
     # accessing courses database
     cursor.execute("USE courses")
@@ -2121,19 +2161,16 @@ def prerequisite_tables(database):
     db.commit()
 
     # creating prerequisite tables needed for the system to function if they dont exist already
-    cursor.execute(
-        "CREATE TABLE IF NOT EXISTS teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT, first_name VARCHAR(30) NOT NULL, last_name VARCHAR(30) NOT NULL, username VARCHAR(20) NOT NULL,email TEXT(50) NULL, password VARCHAR(20) NOT NULL,  PRIMARY KEY (teacher_id), UNIQUE (username))")
+    cursor.execute("CREATE TABLE IF NOT EXISTS teachers (teacher_id INT(5) NOT NULL AUTO_INCREMENT, first_name VARCHAR(30) NOT NULL, last_name VARCHAR(30) NOT NULL, username VARCHAR(20) NOT NULL,email TEXT(50) NULL, password VARCHAR(20) NOT NULL,  PRIMARY KEY (teacher_id), UNIQUE (username))")
     db.commit()
 
-    cursor.execute(
-        "CREATE TABLE IF NOT EXISTS subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (id))")
+    cursor.execute("CREATE TABLE IF NOT EXISTS subjects (id VARCHAR(10) NOT NULL , name TEXT NOT NULL ,semester INT(2) NOT NULL , teacher_id INT(5) NULL , PRIMARY KEY (id))")
     db.commit()
 
     # creating foreign key for subjects and teachers for teacher_id
     cursor.execute("SHOW TABLES LIKE 'subjects'")
     if len([x[0] for x in cursor.fetchall()]) < 1:
-        cursor.execute(
-            "ALTER TABLE subjects ADD FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL ON UPDATE CASCADE")
+        cursor.execute("ALTER TABLE subjects ADD FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL ON UPDATE CASCADE")
         db.commit()
 
     # creating table to store students semester count, year start and expected year of graduation
@@ -2152,7 +2189,8 @@ def main():
     database, course, course_len = map(str, course_select())
     course_len = int(course_len)
 
-    prerequisite_tables(database)  # checking if prerequisite tables for the database are there, if not, create them
+    # checking if prerequisite tables for the database are there, if not, create them
+    prerequisite_tables(database)
 
     """ PATH TO SQL DATABASES STORED ON YOUR DEVICE """
     path = f"C:/ProgramData/MySQL/MySQL Server 8.0/Data/{database}"
@@ -2181,6 +2219,7 @@ def main():
 
 # war begins, ionia calls. hasagi
 if __name__ == "__main__":
-    db = mysql.connect(host='localhost', user='Ashwin', password='3431')  # initializing connection to MySQL
+    # initializing connection to MySQL
+    db = mysql.connect(host='localhost', user='Ashwin', password='3431')
     cursor = db.cursor(buffered=True)
     main()
