@@ -248,6 +248,8 @@ def rolling_predict(marks, subject, record):
             for y in range(amounts[x]):
                 mults.append((dummy[c] / max_marks[x]) * (weightages[x] / amounts[x]))
                 c += 1
+                del y
+
         mults = [np.round(x*100, 2) for x in mults]
         p_grade = np.sum(mults)
         actual_grades.append(np.round(p_grade, 2))
@@ -1689,6 +1691,14 @@ def admin_session(user):
                     first = input("First name : ")
                     last = input("Last name : ")
                     user = input("Enter username : ")
+
+                    cursor.execute("SELECT username FROM teachers")
+                    existing_users = [x[0] for x in cursor.fetchall()]
+                    if user in existing_users:
+                        os.system('cls')
+                        print(f"{user} already exists, going back...\n")
+                        continue
+
                     passw = input("Enter password : ")
                     email = f"{first}.{last}@dypiu.ac.in"
                     cursor.execute(
@@ -2179,6 +2189,7 @@ def prerequisite_tables(database):
 
 
 def main():
+    os.system('cls')
     # running function to select a course (or add prerequisite tables for courses database)
 
     global database
