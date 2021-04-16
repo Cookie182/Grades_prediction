@@ -2259,7 +2259,7 @@ class start:
             return cursor.fetchall()[0]
         else:
             db.close()
-            exit("Bye!")
+            exit("Bye! ")
 
     def prerequisite_tables(database):
         # creating database for course if it doesnt exist already
