@@ -1507,7 +1507,7 @@ class admin:
                                     tests.append(x[0])
 
                             # creating new mark sheet for students doing that particular subject
-                            cursor.execute(f"CREATE TABLE IF NOT EXISTS {new_table} (student_id INT(5) PRIMARY KEY)")
+                            cursor.execute(f"CREATE TABLE IF NOT EXISTS {new_table} (student_id INT(5) NOT NULL PRIMARY KEY)")
 
                             # adding foreign key to link student ids together
                             cursor.execute(
@@ -1853,7 +1853,7 @@ class admin:
                         tests.append(x[0])
 
                 # creating new mark sheet for students doing that particular subject
-                cursor.execute(f"CREATE TABLE {new_table} (student_id INT(5) PRIMARY KEY)")
+                cursor.execute(f"CREATE TABLE {new_table} (student_id INT(5) NOT NULL PRIMARY KEY)")
 
                 # adding foreign key to link student ids together
                 cursor.execute(
@@ -2197,7 +2197,7 @@ class start:
             cursor.execute("USE courses_faculty")
 
             # creating admins table
-            cursor.execute("CREATE TABLE IF NOT EXISTS admins (id INT AUTO_INCREMENT PRIMARY KEY, first_name TEXT DEFAULT NULL, last_name TEXT DEFAULT NULL, username VARCHAR(20) UNIQUE NOT NULL, password VARCHAR(20) NOT NULL, email TEXT NOT NULL, mobile VARCHAR(15) DEFAULT NULL, added_by VARCHAR(20) DEFAULT NULL)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS admins (id INT(3) NOT NULL AUTO_INCREMENT PRIMARY KEY, first_name TEXT DEFAULT NULL, last_name TEXT DEFAULT NULL, username VARCHAR(20) UNIQUE NOT NULL, password VARCHAR(20) NOT NULL, email TEXT NOT NULL, mobile VARCHAR(15) DEFAULT NULL, added_by VARCHAR(20) DEFAULT NULL)")
 
             print("Admins table created, input details for admin to be added: \n")
             while True:
