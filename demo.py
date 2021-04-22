@@ -359,7 +359,7 @@ class student:
 
                 if subject != "Go Back":
                     print(tabulate(pd.read_sql(f"SELECT * FROM {subject}_details",
-                                               db, index_col='Type'), headers='keys', tablefmt='psql'))
+                                               db, index_col='Type'), headers='keys', tablefmt='grid'))
                     print(f"\nDetails shown for {subject}\n")
                     input("Press anything to continue...\n")
                     os.system('cls')
@@ -718,7 +718,7 @@ class teacher:
 
         if subject != "Go Back":
             table = f"{subject}_details"
-            print(tabulate(pd.read_sql(f"SELECT * FROM {table}", db, index_col="Type"), headers='keys', tablefmt='psql'))
+            print(tabulate(pd.read_sql(f"SELECT * FROM {table}", db, index_col="Type"), headers='keys', tablefmt='grid'))
             print(f"Details for {subject} shown\n")
             input("\nEnter anything to continue...")
             os.system('cls')
@@ -730,7 +730,7 @@ class teacher:
         os.system('cls')
         print("Changing teacher account details\n")
         df = pd.read_sql(f"SELECT * FROM courses_faculty.teachers WHERE teacher_id = {self.teacher_id}", db, index_col='teacher_id')
-        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
         cursor.execute("DESCRIBE courses_faculty.teachers")
         details = [x[0] for x in cursor.fetchall()]
 
@@ -749,7 +749,7 @@ class teacher:
 
             print("New details")
             df = pd.read_sql(f"SELECT * FROM courses_faculty.teachers WHERE teacher_id = {self.teacher_id}", db, index_col='teacher_id')
-            print(tabulate(df, headers='keys', tablefmt='psql'))
+            print(tabulate(df, headers='keys', tablefmt='grid'))
             input("Press anything to continue...")
 
             os.system('cls')
@@ -860,13 +860,13 @@ class teacher:
                         query = f"SELECT id, first_name, last_name, username, email, entry, PREDICTED_GRADE FROM {record}, {record}_{subject} WHERE {record}.id = {record}_{subject}.student_id AND id IN (SELECT student_id FROM {record}_{subject} WHERE SUBSTRING(PREDICTED_GRADE, 1, 5) >= 60)"
 
                         df = pd.read_sql(query, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
 
                         print("Predicted to fail:")
                         query = f"SELECT id, first_name, last_name, username, email, entry, PREDICTED_GRADE FROM {record}, {record}_{subject} WHERE {record}.id = {record}_{subject}.student_id AND id IN (SELECT student_id FROM {record}_{subject} WHERE SUBSTRING(PREDICTED_GRADE, 1, 5) < 60)"
 
                         df = pd.read_sql(query, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
 
@@ -878,13 +878,13 @@ class teacher:
                         query = f"SELECT id, first_name, last_name, username, email, entry, GRADE FROM {record}, {record}_{subject} WHERE {record}.id = {record}_{subject}.student_id AND id IN (SELECT student_id FROM {record}_{subject} WHERE SUBSTRING(GRADE, 1, 5) >= 60)"
 
                         df = pd.read_sql(query, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
 
                         print("Going to fail:")
                         query = f"SELECT id, first_name, last_name, username, email, entry, GRADE FROM {record}, {record}_{subject} WHERE {record}.id = {record}_{subject}.student_id AND id IN (SELECT student_id FROM {record}_{subject} WHERE SUBSTRING(GRADE, 1, 5) < 60)"
 
                         df = pd.read_sql(query, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
                     else:
@@ -1220,7 +1220,7 @@ class teacher:
                     table = f"{record}_{subject}".lower()
                     print('')
                     print(table)
-                    print(tabulate(pd.read_sql(f"SELECT * FROM {table}", db, index_col='student_id'), headers='keys', tablefmt='psql'), '\n')
+                    print(tabulate(pd.read_sql(f"SELECT * FROM {table}", db, index_col='student_id'), headers='keys', tablefmt='grid'), '\n')
                     print(f"{record}_{subject} values shown\n")
                     input("Press anything to continue...")
                     os.system('cls')
@@ -1351,12 +1351,12 @@ class admin:
 
             else:
                 print("\nDescribing the table\n")
-                print(tabulate(pd.read_sql(f"DESC {choice}", db, index_col='Field'), headers='keys', tablefmt='psql'), '\n')
+                print(tabulate(pd.read_sql(f"DESC {choice}", db, index_col='Field'), headers='keys', tablefmt='grid'), '\n')
 
                 print("Details within the table\n")
                 df = pd.read_sql(f"SELECT * FROM {choice}", db)
                 df = df.set_index(df.columns[0])
-                print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+                print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
 
                 input("Press anything to continue...")
                 os.system('cls')
@@ -1375,10 +1375,8 @@ class admin:
                     try:
                         course_id = input("Enter course id : ").replace(' ', '_')
                         name = input("Full name of course : ")
-                        founded = int(
-                            input("What year was the course founded? : "))
-                        years = int(
-                            input("How many years does the course last? : "))
+                        founded = int(input("What year was the course founded? : "))
+                        years = int(input("How many years does the course last? : "))
                         course_type = questionary.select("What type of course is this?", choices=["Bachelors",
                                                                                                   "Masters",
                                                                                                   "PhD"]).ask()
@@ -1646,7 +1644,7 @@ class admin:
         subj_choices = [x[0] for x in cursor.fetchall()]
         subj_choices.append("Go Back")
         subj = questionary.select("Which subject?: ", choices=subj_choices).ask()
-        print(tabulate(pd.read_sql(f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
+        print(tabulate(pd.read_sql(f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
 
         # getting teacher id and TA id for subjects
         cursor.execute(f"SELECT teacher_id FROM subjects WHERE id = '{subj}'")
@@ -1698,7 +1696,7 @@ class admin:
         os.system('cls')
         print("Deleting a teacher\n")
         print(tabulate(pd.read_sql("SELECT * FROM courses_faculty.teachers", db,
-                                   index_col='teacher_id'), headers='keys', tablefmt='psql'), '\n')
+                                   index_col='teacher_id'), headers='keys', tablefmt='grid'), '\n')
         cursor.execute("SELECT teacher_id FROM courses_faculty.teachers")
         print("Choose id of teacher to delete\n")
         id = int(questionary.select("Choices: ", choices=[str(x[0]) for x in cursor.fetchall()]).ask())
@@ -1736,7 +1734,7 @@ class admin:
             # if there is a teacher assigned
             if teacher_id is not None:
                 print(tabulate(pd.read_sql(
-                    f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
+                    f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
 
                 choice = questionary.select("Unassign teacher from subject?", choices=['Yes', 'No']).ask()
                 if choice == 'Yes':
@@ -1757,7 +1755,7 @@ class admin:
             # if teachign assistant is assigned
             if ta_id is not None:
                 print(tabulate(pd.read_sql(
-                    f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
+                    f"SELECT * FROM subjects WHERE id = '{subj}'", db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
 
                 choice = questionary.select("Unassign teaching assistant from subject?", choices=['Yes', 'No']).ask()
                 if choice == 'Yes':
@@ -1959,7 +1957,7 @@ class admin:
             student_record = f"students_{year}"
             df = pd.read_sql(
                 f"SELECT id, first_name, last_name, mobile_no, email, username, start_year, start_sem, cur_semester, entry, grad_year FROM {student_record}", db, index_col='id')
-            print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
+            print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
             user = input("Enter username of student to delete : ")
 
             cursor.execute(f"SELECT username FROM {student_record}")
@@ -1967,7 +1965,7 @@ class admin:
             if user in users:
                 os.system('cls')
                 print(f"\nAre you sure to delete {user}?")
-                print(tabulate(df[df['username'] == user], headers='keys', tablefmt='psql'), '\n')
+                print(tabulate(df[df['username'] == user], headers='keys', tablefmt='grid'), '\n')
 
                 choice = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
                 if choice == "Yes":
@@ -1996,7 +1994,7 @@ class admin:
     def manage_account(user):
         print("Viewing account details\n")
         print(tabulate(pd.read_sql(
-            f"SELECT * FROM courses_faculty.admins WHERE username = '{user}'", db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
+            f"SELECT * FROM courses_faculty.admins WHERE username = '{user}'", db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
 
         # asking whether to change account details or not
         choice = questionary.select("Choice : ", choices=["Change account details", "Go Back"]).ask()
