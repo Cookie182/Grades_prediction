@@ -329,7 +329,8 @@ class student:
     def view_subjectteacherta(self):
         os.system('cls')
         print("Showing details about teachers/TAs for each subject\n")
-        start_year = self.record[-4:]
+        cursor.execute(f"SELECT cur_semester FROM students_batch WHERE start_year = '{self.record[-4:]}'")
+        cur_sem = cursor.fetchone()[0]
         # printing details about each teacher and TA for EACH subject even if it is the same teacher/TA for subjects they have been taught
         print(tabulate(pd.read_sql(f"""
                                     SELECT subjects.id,
@@ -342,7 +343,7 @@ class student:
                                     FROM subjects,
                                         courses_faculty.teachers
                                     WHERE subjects.teacher_id = courses_faculty.teachers.teacher_id
-                                        AND subjects.semester <= {start_year}
+                                        AND subjects.semester <= {cur_sem}
                                     UNION
                                     SELECT subjects.id,
                                         subjects.name,
@@ -354,7 +355,7 @@ class student:
                                     FROM subjects,
                                         courses_faculty.teachers
                                     WHERE subjects.ta_id = courses_faculty.teachers.teacher_id
-                                        AND subjects.semester <= {start_year}
+                                        AND subjects.semester <= {cur_sem}
                                    """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
         input("Press anything to continue...")
 
@@ -621,43 +622,29 @@ class student:
                 break
 
     def student_auth(self):
+        print("Student login\n")
+        # students login with their email rather than username
         os.system('cls')
         print("Student Login")
-        cursor.execute("""
-                       SELECT start_year
-                       FROM students_batch
-                       """)
-        records = [str(x[0]) for x in cursor.fetchall()]
-        records.append("Go Back")
-        print("\nWhich record do you belong to?\n")
-        # choosing which student record they belong to
-        record = questionary.select("Choices: ", choices=records).ask()
-        if record != "Go Back":
-            record = f"students_{record}"
-            user = input("Username : ")  # checking login details
-            passw = stdiomask.getpass(prompt='Password : ')
 
-            valid_login = False
-            # gathering all the student usernames from selected student record
-            cursor.execute(f"""
-                           SELECT username
-                           FROM {record}
-                           """)
-            if user in [x[0] for x in cursor.fetchall()]:
-                cursor.execute(f"""
-                               SELECT password
-                               FROM {record}
-                               WHERE username = '{user}'
-                               """)
-                if passw == cursor.fetchall()[0][0]:
-                    valid_login = True
+        email = input("Enter email: ")
+        passw = stdiomask.getpass(prompt='Passowrd: ')
+
+        try:
+            email = email.strip("@dypiu.ac.in")  # extracting email domain
+            record = f"students_{int(email[-4:])}"  # creating name of student records table
+            user = email[:-5]  # extracting username from email
+            cursor.execute(f"""SELECT username FROM {record}""")
+            users = [x[0] for x in cursor.fetchall()]
+            if user in users:
+                cursor.execute(f"""SELECT password FROM {record} WHERE username = '{user}'""")
+                if passw == cursor.fetchone()[0]:
                     self.record = record
                     self.user = user
-                    self.student_session()  # launching student session
-
-            if valid_login == False:
-                os.system('cls')
-                print("Incorrect student login details...\n")
+                    self.student_session()
+        except:
+            os.system('cls')
+            print("Incorrent student login details...\n")
 
 
 class teacher:
