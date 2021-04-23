@@ -622,16 +622,14 @@ class student:
                 break
 
     def student_auth(self):
-        print("Student login\n")
-        # students login with their email rather than username
         os.system('cls')
-        print("Student Login")
+        print("Student Login\n")
 
         email = input("Enter email: ")
         passw = stdiomask.getpass(prompt='Passowrd: ')
 
         try:
-            email = email.strip("@dypiu.ac.in")  # extracting email domain
+            email = email.rstrip("@dypiu.ac.in")  # extracting email domain
             record = f"students_{int(email[-4:])}"  # creating name of student records table
             user = email[:-5]  # extracting username from email
             cursor.execute(f"""SELECT username FROM {record}""")
@@ -642,6 +640,12 @@ class student:
                     self.record = record
                     self.user = user
                     self.student_session()
+                else:
+                    os.system('cls')
+                    print("Incorrect login details...\n")
+            else:
+                os.system('cls')
+                print("Incorrect login details...\n")
         except:
             os.system('cls')
             print("Incorrent student login details...\n")
