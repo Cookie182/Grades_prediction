@@ -214,11 +214,11 @@ class predictors:
         if actual_grades_l % 2 == 0:
             actual_grades_l -= 1
 
-        actual_grades = savgol_filter(actual_grades, actual_grades_l, 4)
-
-        # limits determined to scale the overall grade graph better
-        limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))
         actual_grade = get_grade(actual_grades[-1])
+        # limits determined to scale the overall grade graph better
+        actual_grades = savgol_filter(actual_grades, actual_grades_l, 4)
+        limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))
+
 
         # getting the name of tests used for predictions
         cursor.execute(f"DESCRIBE {record}_{subject}")
@@ -226,11 +226,11 @@ class predictors:
 
         fig = plt.figure(f"Grade prediction and calculation for {subject}", figsize=(10, 5))
         grid = gs(nrows=2, ncols=2, figure=fig)
-        plt.suptitle(f"Chance of Passing and Predicted Total Grade for {subject}\nTake the predictions with a grain of salt", fontsize=12)
+        plt.suptitle(f"Chance of Passing and Predicted Total Grade for {subject}\
+                        \nTake the predictions with a grain of salt", fontsize=12)
         fig.add_subplot(grid[0, 0])
         plt.title(f"Probability of passing the subject after each test taken\
-            \nPredicted Pass or Fail? -> {pf}\
-                \nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=11)
+            \nPredicted Pass or Fail? -> {pf}\nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=11)
         plt.axhline(50, color='r', label="Threshold", linestyle='--')
         plt.plot(tests[:-1], pass_probabs, c='black',
                  lw=1, label='Predicted passing chance')
