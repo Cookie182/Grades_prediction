@@ -13,7 +13,7 @@ from mysql import connector as mysql
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold
-from sklearn.metrics import f1_score, plot_confusion_matrix
+from sklearn.metrics import f1_score
 from sklearn.linear_model import LinearRegression, LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 
@@ -218,7 +218,6 @@ class predictors:
         # limits determined to scale the overall grade graph better
         actual_grades = savgol_filter(actual_grades, actual_grades_l, 4)
         limit3 = math.ceil(max([abs(x-60) for x in actual_grades]))
-
 
         # getting the name of tests used for predictions
         cursor.execute(f"DESCRIBE {record}_{subject}")
