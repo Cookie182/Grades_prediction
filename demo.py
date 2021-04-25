@@ -957,7 +957,8 @@ class teacher:
 
                     fig.add_subplot(224)
                     plt.title("Actual Letter Grades", fontsize=12)
-                    plt.pie([np.count_nonzero(actual_grade_l == x) for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
+                    plt.pie([np.count_nonzero(actual_grade_l == x)
+                            for x in np.unique(actual_grade_l)], labels=np.unique(actual_grade_l), autopct='%.2f%%')
                     plt.legend(loc='best')
                     plt.tight_layout()
                     plt.show()
