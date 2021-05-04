@@ -224,10 +224,10 @@ class predictors:
         tests = [x[0] for x in cursor.fetchall()][1:-3]
 
         fig = plt.figure(f"Grade prediction and calculation for {subject}", figsize=(10, 5))
-        grid = gs(nrows=2, ncols=2, figure=fig)
+        psql = gs(nrows=2, ncols=2, figure=fig)
         plt.suptitle(f"Chance of Passing and Predicted Total Grade for {subject}\
                         \nTake the predictions with a grain of salt", fontsize=12)
-        fig.add_subplot(grid[0, 0])
+        fig.add_subplot(psql[0, 0])
         plt.title(f"Probability of passing the subject after each test taken\
             \nPredicted Pass or Fail? -> {pf}\nChance of passing subject -> {passfail.predict_proba(marks)[0][1] * 100:.2f}%", fontsize=11)
         plt.axhline(50, color='r', label="Threshold", linestyle='--')
@@ -241,7 +241,7 @@ class predictors:
         plt.legend(loc='best', fontsize=7)
         plt.tight_layout()
 
-        fig.add_subplot(grid[0, 1])
+        fig.add_subplot(psql[0, 1])
         plt.title(f"Predicting Overall grade after each test\
             \nPredicted Overall Subject Grade (out of 100)-> {grade_p:.2f}\nPredicted Grade -> {grade}", fontsize=11)
         plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
@@ -254,7 +254,7 @@ class predictors:
         plt.legend(loc='best', fontsize=7)
         plt.tight_layout()
 
-        fig.add_subplot(grid[1, :])
+        fig.add_subplot(psql[1, :])
         plt.title(f"Actual Rolling Total Mark (out of 100) calculated for {subject} -> {actual_calc_grade} ({actual_grade})", fontsize=11)
         plt.axhline(60, color='r', label='Passing Threshold', linestyle='--')
         plt.plot(tests, actual_grades, c='black', lw=1, label='Caculated Grade (After each test)')
@@ -355,7 +355,7 @@ class student:
                                         courses_faculty.teachers
                                     WHERE subjects.ta_id = courses_faculty.teachers.teacher_id
                                         AND subjects.semester <= {cur_sem}
-                                   """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
+                                   """, db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
         input("Press anything to continue...")
 
         os.system('cls')
@@ -415,7 +415,7 @@ class student:
                     print(tabulate(pd.read_sql(f"""
                                                SELECT *
                                                FROM {subject}_details
-                                               """, db, index_col='Type'), headers='keys', tablefmt='grid'))
+                                               """, db, index_col='Type'), headers='keys', tablefmt='psql'))
                     print(f"\nDetails shown for {subject}\n")
                     input("Press anything to continue...\n")
                     os.system('cls')
@@ -841,7 +841,7 @@ class teacher:
             print(tabulate(pd.read_sql(f"""
                                        SELECT *
                                        FROM {table}
-                                       """, db, index_col="Type"), headers='keys', tablefmt='grid'))
+                                       """, db, index_col="Type"), headers='keys', tablefmt='psql'))
             print(f"Details for {subject} shown\n")
             input("\nEnter anything to continue...")
             os.system('cls')
@@ -857,7 +857,7 @@ class teacher:
                          FROM courses_faculty.teachers
                          WHERE teacher_id = {self.teacher_id}
                          """, db, index_col='teacher_id')
-        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
         cursor.execute("DESCRIBE courses_faculty.teachers")
         details = [x[0] for x in cursor.fetchall()]
 
@@ -883,7 +883,7 @@ class teacher:
                              FROM courses_faculty.teachers
                              WHERE teacher_id = {self.teacher_id}
                              """, db, index_col='teacher_id')
-            print(tabulate(df, headers='keys', tablefmt='grid'))
+            print(tabulate(df, headers='keys', tablefmt='psql'))
             input("Press anything to continue...")
 
             os.system('cls')
@@ -1029,7 +1029,7 @@ class teacher:
                                                  FROM {record}_{subject}
                                                  WHERE SUBSTRING(PREDICTED_GRADE, 1, 5) >= 60)
                                          """, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
 
                         print("Predicted to fail:")
                         df = pd.read_sql(f"""
@@ -1048,7 +1048,7 @@ class teacher:
                                                  FROM {record}_{subject}
                                                  WHERE SUBSTRING(PREDICTED_GRADE, 1, 5) < 60)
                                          """, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
 
@@ -1068,13 +1068,13 @@ class teacher:
                                              GRADE
                                          FROM {record},
                                              {record}_{subject}
-                                         WHERE {record}.id = {record}_ {subject}.student_id
+                                         WHERE {record}.id = {record}_{subject}.student_id
                                              AND id IN (
                                                  SELECT student_id
                                                  FROM {record}_{subject}
                                                  WHERE SUBSTRING(GRADE, 1, 5) >= 60)
                                          """, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
 
                         print("Going to fail:")
                         df = pd.read_sql(f"""
@@ -1093,7 +1093,7 @@ class teacher:
                                                  FROM {record}_{subject}
                                                  WHERE SUBSTRING(GRADE, 1, 5) < 60)
                                          """, db, index_col='id')
-                        print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+                        print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
                         input("Press anything to continue...")
                         os.system('cls')
                     else:
@@ -1491,7 +1491,7 @@ class teacher:
                     print(tabulate(pd.read_sql(f"""
                                                SELECT *
                                                FROM {table}
-                                               """, db, index_col='student_id'), headers='keys', tablefmt='grid'), '\n')
+                                               """, db, index_col='student_id'), headers='keys', tablefmt='psql'), '\n')
                     print(f"{record}_{subject} values shown\n")
                     input("Press anything to continue...")
                     os.system('cls')
@@ -1656,7 +1656,7 @@ class admin:
 
             else:
                 print("\nDescribing the table\n")
-                print(tabulate(pd.read_sql(f"DESC {choice}", db, index_col='Field'), headers='keys', tablefmt='grid'), '\n')
+                print(tabulate(pd.read_sql(f"DESC {choice}", db, index_col='Field'), headers='keys', tablefmt='psql'), '\n')
 
                 print("Details within the table\n")
                 df = pd.read_sql(f"""
@@ -1664,7 +1664,7 @@ class admin:
                                  FROM {choice}
                                  """, db)
                 df = df.set_index(df.columns[0])
-                print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+                print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
 
                 input("Press anything to continue...")
                 os.system('cls')
@@ -2033,7 +2033,7 @@ class admin:
                                    SELECT *
                                    FROM subjects
                                    WHERE id = '{subj}'
-                                   """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
+                                   """, db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
 
         # getting teacher id and TA id for subjects
         cursor.execute(f"""
@@ -2075,7 +2075,7 @@ class admin:
                                                              email
                                                          FROM courses_faculty.teachers
                                                          WHERE type = 'Teacher'
-                                                         """, db, index_col='teacher_id'), headers='keys', tablefmt='grid'))
+                                                         """, db, index_col='teacher_id'), headers='keys', tablefmt='psql'))
 
                         cursor.execute("""
                                        SELECT teacher_id
@@ -2115,7 +2115,7 @@ class admin:
                                                              email
                                                          FROM courses_faculty.teachers
                                                          WHERE type != 'Teacher'
-                                                         """, db, index_col='teacher_id'), headers='keys', tablefmt='grid'))
+                                                         """, db, index_col='teacher_id'), headers='keys', tablefmt='psql'))
 
                         cursor.execute("""
                                        SELECT teacher_id
@@ -2147,7 +2147,7 @@ class admin:
         print(tabulate(pd.read_sql("""
                                    SELECT *
                                    FROM courses_faculty.teachers
-                                   """, db, index_col='teacher_id'), headers='keys', tablefmt='grid'), '\n')
+                                   """, db, index_col='teacher_id'), headers='keys', tablefmt='psql'), '\n')
         cursor.execute("""
                        SELECT teacher_id
                        FROM courses_faculty.teachers
@@ -2209,7 +2209,7 @@ class admin:
                                            SELECT *
                                            FROM subjects
                                            WHERE id = '{subj}'
-                                           """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
+                                           """, db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
 
                 choice = questionary.select("Unassign teacher from subject?", choices=['Yes', 'No']).ask()
                 if choice == 'Yes':
@@ -2237,7 +2237,7 @@ class admin:
                                            SELECT *
                                            FROM subjects
                                            WHERE id = '{subj}'
-                                           """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
+                                           """, db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
 
                 choice = questionary.select("Unassign teaching assistant from subject?", choices=['Yes', 'No']).ask()
                 if choice == 'Yes':
@@ -2622,7 +2622,7 @@ class admin:
                                  grad_year
                              FROM {student_record}
                              """, db, index_col='id')
-            print(tabulate(df, headers='keys', tablefmt='grid'), '\n')
+            print(tabulate(df, headers='keys', tablefmt='psql'), '\n')
             user = input("Enter username of student to delete : ")
 
             cursor.execute(f"SELECT username FROM {student_record}")
@@ -2630,7 +2630,7 @@ class admin:
             if user in users:
                 os.system('cls')
                 print(f"\nAre you sure to delete {user}?")
-                print(tabulate(df[df['username'] == user], headers='keys', tablefmt='grid'), '\n')
+                print(tabulate(df[df['username'] == user], headers='keys', tablefmt='psql'), '\n')
 
                 choice = questionary.select("Choices: ", choices=["Yes", "No"]).ask()
                 if choice == "Yes":
@@ -2681,7 +2681,7 @@ class admin:
                                    SELECT *
                                    FROM courses_faculty.admins
                                    WHERE username = '{user}'
-                                   """, db, index_col='id'), headers='keys', tablefmt='grid'), '\n')
+                                   """, db, index_col='id'), headers='keys', tablefmt='psql'), '\n')
 
         # asking whether to change account details or not
         choice = questionary.select("Choice : ", choices=["Change account details", "Go Back"]).ask()
